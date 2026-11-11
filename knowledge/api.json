@@ -1,0 +1,794 @@
+[
+  {
+    "id": "api-bola",
+    "kind": "lesson",
+    "category": "API 安全",
+    "cwe": "CWE-639",
+    "title": "对象级授权失效（BOLA）",
+    "title_en": "Broken Object Level Authorization",
+    "level": "intermediate",
+    "icon": "BOLA",
+    "color": "access",
+    "summary": "接口能正确判断\"你是不是登录了\"，却没判断\"这个对象是不是你的\"。这是 API 场景里出现频率最高的一类越权。",
+    "summary_en": "The endpoint correctly checks whether you are logged in but not whether the object belongs to you. This is the most frequent authorization flaw in APIs.",
+    "sections": [
+      {
+        "h": "为什么它排在 API 风险第一位",
+        "h_en": "Why it ranks first among API risks",
+        "p": "因为 API 天然以对象标识符为中心，路径或参数里到处都是 id。只要有一处忘记做归属校验，攻击者把 id 递增一遍就能批量拉走别人的数据。而这个问题在功能测试里完全看不出来——测试用的都是自己的 id，一切正常。",
+        "p_en": "APIs are naturally built around object identifiers, so ids appear throughout paths and parameters. One missing ownership check lets an attacker walk the ids and pull out other people data in bulk. Functional tests never catch it because they use their own ids and everything looks fine.",
+        "code": []
+      },
+      {
+        "h": "三种常见的漏检形态",
+        "h_en": "Three common shapes of the flaw",
+        "p": "一、只在列表接口做了过滤，详情接口直接按 id 查。二、新建与更新接口校验了归属，删除接口忘了。三、嵌套资源只校验了父对象，忽略了子对象属于另一个父对象的情况。三者的共同点是\"同一条数据有多个入口，只有部分入口做了检查\"。审计时应按数据对象而不是按接口逐个盘点入口。",
+        "p_en": "The list endpoint filters by owner while the detail endpoint queries by id alone; create and update validate ownership but delete does not; nested resources validate the parent but ignore a child belonging to a different parent. Common thread: one record has several entry points and only some are checked. Audit by data object, not by endpoint.",
+        "code": [
+          {
+            "lang": "python",
+            "title": "归属校验必须与查询同源",
+            "bad": "@app.get(\"/orders/{oid}\")\ndef get_order(oid: int, user=Depends(current_user)):\n    # Lookup by id alone lets any logged-in user read others orders\n    return db.query(Order).get(oid)",
+            "good": "@app.get(\"/orders/{oid}\")\ndef get_order(oid: int, user=Depends(current_user)):\n    # Ownership in the query means an unauthorized object simply does not exist\n    order = db.query(Order).filter(\n        Order.id == oid,\n        Order.owner_id == user.id\n    ).first()\n    if not order:\n        raise HTTPException(404)   # no not-found vs forbidden distinction, avoiding enumeration\n    return order",
+            "note": "关键在把 owner 条件写进 where，而不是查出来再在内存里判断",
+            "title_en": "Ownership must live in the query itself",
+            "note_en": "Put the owner condition in the where clause rather than judging in memory afterwards"
+          }
+        ]
+      },
+      {
+        "h": "为什么\"查出来再判断\"不好",
+        "h_en": "Why post-fetch checks are worse",
+        "p": "先按 id 查出对象、再在代码里比较归属，功能上等价，但有两个隐患：一是容易在某个分支提前 return 而跳过判断；二是错误信息往往区分了\"不存在\"和\"无权限\"，让攻击者可以据此枚举有效 id。把归属条件放进查询语句，语义上就是\"不存在的对象\"，天然不泄露存在性。",
+        "p_en": "Fetching by id then comparing ownership in code is functionally equivalent but carries two risks: an early return in some branch skips the check, and error messages often distinguish not-found from forbidden, letting attackers enumerate valid ids. Putting ownership in the query makes it semantically not-found and leaks no existence.",
+        "code": []
+      },
+      {
+        "h": "怎么系统性地找出来",
+        "h_en": "How to find them systematically",
+        "p": "准备两个账号，用 A 的凭据去访问 B 的对象，逐个接口跑一遍，包括详情、更新、删除、以及嵌套路径。这个测试不需要工具，手工也能覆盖小项目。规模大时再上自动化：把接口清单导出，对每个带 id 的路径做交叉替换。关键是先有一份完整的接口清单，否则永远只能抽查。",
+        "p_en": "Create two accounts and use account A credentials against account B objects across detail, update, delete and nested paths. This needs no tooling and covers small projects by hand. Scale up later by exporting the endpoint inventory and cross-substituting ids. The prerequisite is a complete endpoint list; without it you can only spot-check.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP API1:2023 Broken Object Level Authorization",
+        "url": "https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/"
+      },
+      {
+        "name": "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "url": "https://cwe.mitre.org/data/definitions/639.html"
+      },
+      {
+        "name": "OWASP API Security Top 10",
+        "url": "https://api-security.owasp.org/"
+      }
+    ],
+    "tags": [
+      "API",
+      "越权",
+      "授权",
+      "OWASP"
+    ],
+    "quiz": [
+      {
+        "q": "BOLA 的典型成因是什么？",
+        "options": [
+          "未使用 HTTPS",
+          "接口按对象标识符直接查询，缺少归属校验",
+          "密码强度不足",
+          "日志未加密"
+        ],
+        "answer": 1,
+        "explain": "以 id 为中心的接口设计，一旦漏掉归属条件就能批量越权。",
+        "q_en": "What is the typical cause of BOLA?",
+        "options_en": [
+          "No HTTPS",
+          "Endpoints query directly by object identifier without ownership checks",
+          "Weak passwords",
+          "Unencrypted logs"
+        ],
+        "explain_en": "Id-centric API design means one missing ownership condition grants bulk unauthorized access."
+      },
+      {
+        "q": "为什么建议把归属条件写进查询语句而不是查出来再判断？",
+        "options": [
+          "性能更好",
+          "避免分支提前返回跳过判断，也不会泄露对象是否存在",
+          "代码更短",
+          "兼容性更好"
+        ],
+        "answer": 1,
+        "explain": "写进 where 后，越权对象在语义上就是\"不存在\"，既不泄露存在性也不易被绕过。",
+        "q_en": "Why put the ownership condition into the query rather than checking after fetch?",
+        "options_en": [
+          "Better performance",
+          "It avoids early-return bypasses and does not leak object existence",
+          "Shorter code",
+          "Better compatibility"
+        ],
+        "explain_en": "In the where clause an unauthorized object is simply not found, leaking nothing and being hard to bypass."
+      },
+      {
+        "q": "测试 BOLA 最直接的方法是什么？",
+        "options": [
+          "跑一次压力测试",
+          "用两个账号交叉访问对方对象，覆盖详情、更新、删除与嵌套路径",
+          "检查证书有效期",
+          "阅读框架文档"
+        ],
+        "answer": 1,
+        "explain": "功能测试全程用自己的 id，只有交叉访问才能暴露归属校验缺失。",
+        "q_en": "What is the most direct way to test for BOLA?",
+        "options_en": [
+          "Run a load test",
+          "Cross-access each other objects with two accounts across detail, update, delete and nested paths",
+          "Check certificate expiry",
+          "Read the framework docs"
+        ],
+        "explain_en": "Functional tests use your own ids; only cross-access exposes a missing ownership check."
+      }
+    ]
+  },
+  {
+    "id": "api-mass-assign",
+    "kind": "lesson",
+    "category": "API 安全",
+    "cwe": "CWE-915",
+    "title": "属性级授权与批量赋值",
+    "title_en": "Property-Level Authorization and Mass Assignment",
+    "level": "intermediate",
+    "icon": "MASS",
+    "color": "parse",
+    "summary": "接口把请求体整个映射到数据模型上，于是攻击者在 JSON 里多写一个字段，就成了管理员，或者拿到别人的数据。",
+    "summary_en": "An endpoint maps the whole request body onto a model, so an extra JSON field makes the attacker an admin or exposes someone else data.",
+    "sections": [
+      {
+        "h": "两种形态：多写与多读",
+        "h_en": "Two shapes: over-writing and over-reading",
+        "p": "写方向是批量赋值：请求体里的 role、isAdmin、balance 被框架自动绑定到实体，攻击者顺手提权。读方向是过量数据暴露：接口返回整个实体，包括内部备注、其他用户信息、以及不该出现在客户端的字段。两者根因相同——把\"对外契约\"与\"内部模型\"当成同一个东西。",
+        "p_en": "The write direction is mass assignment: role, isAdmin or balance in the body is auto-bound to the entity, handing out privilege. The read direction is excessive data exposure: the endpoint returns the whole entity including internal notes, other users data, and fields that never belonged client-side. Same root cause: treating the external contract and the internal model as one thing.",
+        "code": []
+      },
+      {
+        "h": "白名单才是解法",
+        "h_en": "Allowlists are the fix",
+        "p": "黑名单永远在追新字段，白名单只需列举允许的字段。工程上应显式定义请求模型，只把明确列出的字段写进实体；返回时同样用显式响应模型，而不是直接序列化实体。多写几行代码，换来的是\"新增内部字段不会自动暴露\"这个长期保障。",
+        "p_en": "A denylist forever chases new fields; an allowlist only enumerates what is permitted. Define an explicit request model and write only those fields; return via an explicit response model rather than serializing the entity. A few extra lines buy the lasting guarantee that new internal fields never auto-expose.",
+        "code": [
+          {
+            "lang": "typescript",
+            "title": "显式请求与响应模型",
+            "bad": "app.patch(\"/users/:id\", async (req, res) => {\n  // The whole body is spread, so role can be changed too\n  await User.update(req.params.id, { ...req.body });\n  res.json(await User.find(req.params.id));\n});",
+            "good": "type UpdateProfile = { displayName?: string; avatarUrl?: string };\n\napp.patch(\"/users/:id\", async (req, res) => {\n  const body = req.body as UpdateProfile;   // an allowlist at the type level\n  const patch: Record<string, unknown> = {};\n  if (typeof body.displayName === \"string\") patch.display_name = body.displayName;\n  if (typeof body.avatarUrl === \"string\")   patch.avatar_url  = body.avatarUrl;\n  // role, balance and friends are not in the allowlist and cannot be written\n  await User.update(req.params.id, patch);\n  res.json({ id: req.params.id, displayName: body.displayName });\n});",
+            "note": "白名单在类型与赋值两层都体现，新增内部字段不会自动变成本地接口的输入",
+            "title_en": "Explicit request and response models",
+            "note_en": "The allowlist appears at both type and assignment layers, so new internal fields never become input"
+          }
+        ]
+      },
+      {
+        "h": "读方向同样要白名单",
+        "h_en": "The read direction needs an allowlist too",
+        "p": "返回整个实体是最常见也最容易被忽视的问题。它不会立刻出错，只会在某天有人给表加了字段之后悄悄泄露。正确做法是为每个接口定义响应模型，明确列出对外字段；内部字段增加时默认不出现，需要时再显式加入。这个习惯的成本很低，收益是长期的。",
+        "p_en": "Returning the whole entity is the most common and most overlooked issue. Nothing breaks immediately; one day a new column silently leaks. Define a response model per endpoint listing external fields; new internal columns stay hidden by default and require explicit inclusion. Low cost, long-term payoff.",
+        "code": []
+      },
+      {
+        "h": "审计时的检索式",
+        "h_en": "What to grep for during audit",
+        "p": "在代码里搜三类写法：把请求体整体展开到更新调用的地方、直接把实体作为响应返回的地方、以及使用自动绑定/自动映射能力而没有任何字段限制的地方。这三类检索能覆盖绝大多数问题，比逐个接口人肉检查快得多。找到后不是加过滤，而是改成显式模型。",
+        "p_en": "Search for three patterns: spreading the whole request body into an update, returning an entity directly as the response, and using auto-binding or auto-mapping with no field restriction. These cover the vast majority and are far faster than reading endpoints one by one. The fix is an explicit model, not an added filter.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP API3:2023 Broken Object Property Level Authorization",
+        "url": "https://api-security.owasp.org/editions/2023/en/0xa3-broken-object-property-level-authorization/"
+      },
+      {
+        "name": "CWE-915: Mass Assignment",
+        "url": "https://cwe.mitre.org/data/definitions/915.html"
+      },
+      {
+        "name": "OWASP Mass Assignment Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "API",
+      "批量赋值",
+      "数据暴露",
+      "OWASP"
+    ],
+    "quiz": [
+      {
+        "q": "批量赋值攻击的直接后果通常是什么？",
+        "options": [
+          "请求变慢",
+          "请求体中未预期的字段被写入实体，导致提权或数据篡改",
+          "证书失效",
+          "日志丢失"
+        ],
+        "answer": 1,
+        "explain": "框架自动绑定让攻击者可以写入本不该由客户端控制的字段。",
+        "q_en": "What is the direct consequence of a mass assignment attack?",
+        "options_en": [
+          "Slower requests",
+          "Unexpected body fields get written to the entity, enabling privilege escalation or tampering",
+          "Certificate expiry",
+          "Lost logs"
+        ],
+        "explain_en": "Auto-binding lets attackers write fields the client was never meant to control."
+      },
+      {
+        "q": "为什么字段控制要用白名单而不是黑名单？",
+        "options": [
+          "白名单性能更好",
+          "黑名单需要不断追新字段，白名单只列举允许项",
+          "白名单代码更短",
+          "黑名单不兼容 JSON"
+        ],
+        "answer": 1,
+        "explain": "新增内部字段时，白名单默认不暴露，黑名单默认暴露，方向正好相反。",
+        "q_en": "Why use an allowlist rather than a denylist for field control?",
+        "options_en": [
+          "Better performance",
+          "A denylist must chase every new field; an allowlist enumerates permitted ones",
+          "Shorter code",
+          "Denylists do not work with JSON"
+        ],
+        "explain_en": "With new internal fields an allowlist hides by default while a denylist exposes by default — opposite directions."
+      },
+      {
+        "q": "返回整个实体对象的主要风险是什么？",
+        "options": [
+          "响应体积变大",
+          "将来新增的内部字段会在无人察觉的情况下被暴露",
+          "序列化速度慢",
+          "破坏缓存"
+        ],
+        "answer": 1,
+        "explain": "问题不会立刻报错，只在某天新增字段后静默泄露，因此必须用显式响应模型。",
+        "q_en": "What is the main risk of returning a whole entity object?",
+        "options_en": [
+          "Bigger responses",
+          "Future internal fields get exposed without anyone noticing",
+          "Slow serialization",
+          "It breaks caching"
+        ],
+        "explain_en": "Nothing errors immediately; a future column leaks silently, so explicit response models are required."
+      }
+    ]
+  },
+  {
+    "id": "api-resource-consumption",
+    "kind": "lesson",
+    "category": "API 安全",
+    "cwe": "CWE-770",
+    "title": "资源消耗不设限",
+    "title_en": "Unrestricted Resource Consumption",
+    "level": "intermediate",
+    "icon": "RATE",
+    "color": "dos",
+    "summary": "接口没有限定单次请求能消耗多少资源，于是攻击者用一个请求就能触发一次昂贵的后端操作，成本由你承担。",
+    "summary_en": "An endpoint places no bound on per-request resource cost, so one crafted request triggers an expensive backend operation that you pay for.",
+    "sections": [
+      {
+        "h": "它比传统拒绝服务隐蔽",
+        "h_en": "It is subtler than classic denial of service",
+        "p": "传统拒绝服务靠流量洪峰，容易被流量层识别。这一类靠\"合法但昂贵\"的请求：一次分页参数巨大返回全表、一次图片处理传入超大尺寸、一次短信验证码接口被循环调用产生真实费用。请求本身完全合规，只是没有上限。",
+        "p_en": "Classic denial of service relies on traffic floods and is visible at the network layer. This class relies on legal-but-expensive requests: an enormous page size returning a whole table, an oversized image for resizing, an SMS endpoint looped to generate real costs. The request is perfectly valid — it simply has no ceiling.",
+        "code": []
+      },
+      {
+        "h": "必须设上限的五个位置",
+        "h_en": "Five places that need ceilings",
+        "p": "一、分页大小与偏移量，直接决定单次查询规模。二、上传体积与图片解码尺寸，解码后的像素数往往比文件体积大几个数量级。三、正则与解析输入长度，避免灾难性回溯。四、并发与频率，按账户而不是按 IP。五、外部依赖调用次数，尤其是按次计费的短信、邮件、地图类接口。",
+        "p_en": "Pagination size and offset set query scale; upload size plus decoded image dimensions, since decoded pixels dwarf file size; input length for regex and parsing to avoid catastrophic backtracking; concurrency and rate by account rather than IP; and outbound call counts, especially per-call billed SMS, email or mapping APIs.",
+        "code": [
+          {
+            "lang": "typescript",
+            "title": "分页与体积都要有硬上限",
+            "bad": "const limit = Number(req.query.limit) || 20;\n// A client passing 100000 returns the whole table\nconst rows = await db.query(\"SELECT * FROM items LIMIT ?\", [limit]);",
+            "good": "const raw = Number(req.query.limit) || 20;\nconst limit = Math.min(Math.max(1, raw), 100);   // both bounds clamped\n\n// Use cursor paging for large sets to avoid deep-offset scans\nconst rows = await db.query(\n  \"SELECT * FROM items WHERE id > ? ORDER BY id LIMIT ?\",\n  [cursor ?? 0, limit]\n);",
+            "note": "上限保护服务端，游标保护数据库；深偏移会让查询耗时随页数线性增长",
+            "title_en": "Hard ceilings on pagination and payload size",
+            "note_en": "Caps protect the server, cursors protect the database; deep offsets scale cost with page number"
+          }
+        ]
+      },
+      {
+        "h": "为什么按账户限流比按 IP 更合适",
+        "h_en": "Why per-account limits beat per-IP",
+        "p": "IP 在移动网络与办公网里高度共享，按 IP 限流会误伤大量正常用户，同时攻击者换 IP 就绕过。按账户限流绑定到身份，绕过成本高得多。两者应当叠加使用：账户维度限制业务滥用，IP 维度抵御匿名流量冲击。只做其中一种都会留下明显缺口。",
+        "p_en": "IPs are heavily shared on mobile and office networks, so per-IP limits hurt legitimate users while an attacker simply rotates IPs. Per-account limits bind to identity and are far costlier to evade. Use both: accounts constrain business abuse, IPs resist anonymous floods. Either alone leaves a clear gap.",
+        "code": []
+      },
+      {
+        "h": "成本可见性比限流更根本",
+        "h_en": "Cost visibility matters more than rate limiting",
+        "p": "如果不知道一次请求花多少钱，就无法设定合理上限。务实做法是给每个接口标注预估成本（数据库查询、外部调用、CPU 密集处理），并在监控里按接口统计实际消耗。有了这个数据，上限就有了依据，而不是拍一个数字。没有它，限流要么太松要么误伤。",
+        "p_en": "Without knowing what a request costs, you cannot set a sensible ceiling. Annotate each endpoint with an estimated cost (database work, outbound calls, CPU-bound processing) and measure actual consumption per endpoint. That data turns limits into evidence rather than guesses; without it, limits are either too loose or harmful.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP API4:2023 Unrestricted Resource Consumption",
+        "url": "https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/"
+      },
+      {
+        "name": "CWE-770: Allocation of Resources Without Limits",
+        "url": "https://cwe.mitre.org/data/definitions/770.html"
+      },
+      {
+        "name": "CWE-400: Uncontrolled Resource Consumption",
+        "url": "https://cwe.mitre.org/data/definitions/400.html"
+      }
+    ],
+    "tags": [
+      "API",
+      "限流",
+      "资源",
+      "成本"
+    ],
+    "quiz": [
+      {
+        "q": "这一类风险为什么比传统拒绝服务更难识别？",
+        "options": [
+          "因为流量更大",
+          "因为请求本身完全合法，只是没有资源上限",
+          "因为使用加密流量",
+          "因为来自内部网络"
+        ],
+        "answer": 1,
+        "explain": "流量层看不到异常，只有从业务成本角度才能发现。",
+        "q_en": "Why is this class harder to detect than classic denial of service?",
+        "options_en": [
+          "Higher volume",
+          "The requests are perfectly valid; they simply have no resource ceiling",
+          "They use encryption",
+          "They come from inside"
+        ],
+        "explain_en": "The network layer sees nothing unusual; only a cost view exposes it."
+      },
+      {
+        "q": "只按 IP 限流的主要缺陷是什么？",
+        "options": [
+          "实现复杂",
+          "共享 IP 会误伤正常用户，而攻击者换 IP 即可绕过",
+          "不支持 IPv6",
+          "占用内存"
+        ],
+        "answer": 1,
+        "explain": "身份维度才与业务滥用相关，IP 维度只能抵御匿名流量，两者应叠加。",
+        "q_en": "What is the main flaw of per-IP-only rate limiting?",
+        "options_en": [
+          "Complex to build",
+          "Shared IPs hurt legitimate users while an attacker rotates IPs to evade",
+          "No IPv6 support",
+          "Memory usage"
+        ],
+        "explain_en": "Identity correlates with business abuse; IP only resists anonymous floods. Combine both."
+      },
+      {
+        "q": "设定合理资源上限的前提是什么？",
+        "options": [
+          "参考同行配置",
+          "先量化每个接口的预估成本与实际消耗",
+          "使用默认值",
+          "按用户数量平均"
+        ],
+        "answer": 1,
+        "explain": "不知道成本就无法定上限，拍数字的结果通常不是太松就是误伤。",
+        "q_en": "What is the prerequisite for setting sensible resource ceilings?",
+        "options_en": [
+          "Copying a peer config",
+          "Quantifying estimated cost and actual consumption per endpoint first",
+          "Using defaults",
+          "Averaging by user count"
+        ],
+        "explain_en": "Without cost data any limit is a guess, typically too loose or harmful."
+      }
+    ]
+  },
+  {
+    "id": "api-inventory",
+    "kind": "lesson",
+    "category": "API 安全",
+    "cwe": "CWE-1059",
+    "title": "接口资产清单与影子接口",
+    "title_en": "API Inventory and Shadow Endpoints",
+    "level": "intermediate",
+    "icon": "INV",
+    "color": "audit",
+    "summary": "你无法保护一个你不知道存在的接口。影子接口通常不是被攻击者挖出来的，而是被遗忘在代码里、没人下线的旧版本。",
+    "summary_en": "You cannot protect an endpoint you do not know exists. Shadow APIs are rarely discovered by attackers first; they are forgotten older versions nobody retired.",
+    "sections": [
+      {
+        "h": "影子接口是怎么产生的",
+        "h_en": "How shadow endpoints appear",
+        "p": "三种来源：调试期留下的测试路由没有删除；版本升级后旧路径为了兼容保留，但没人负责维护；以及内部服务被错误地暴露到外部入口。共同点是它们都不在任何文档和监控里，因此不做鉴权加固、不打补丁、也从不被测试覆盖。",
+        "p_en": "Three sources: debug routes left after testing; old paths kept for compatibility with no owner; and internal services mistakenly exposed externally. Common thread: none appear in documentation or monitoring, so they get no hardening, no patching, and no test coverage.",
+        "code": []
+      },
+      {
+        "h": "建立清单的最小可行方式",
+        "h_en": "A minimum viable inventory",
+        "p": "两条路并行：从代码侧枚举全部注册的路由，从流量侧汇总实际被访问过的路径。前者告诉你\"存在什么\"，后者告诉你\"被用了什么\"。两者的差集就是重点：存在但从未被访问的可能是废弃接口，被访问但不在代码清单里的可能是遗留服务或第三方入口。",
+        "p_en": "Run two tracks in parallel: enumerate all registered routes from code, and aggregate actually-accessed paths from traffic. The first says what exists; the second what is used. The difference is the interesting part: exists-but-never-accessed suggests dead code, accessed-but-not-in-code suggests legacy services or third-party entry points.",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "两条线索各自枚举，再做差集",
+            "bad": "# Trusting docs only: undisclosed endpoints are never found",
+            "good": "# Code side: dump every registered route (generic example)\ngrep -rE \"(app|router)\\.(get|post|put|patch|delete)\\(\" src/ \\\n  | sed -E \"s/.*\\(([\\x27\\x22][^\\x27\\x22]+).*/\\1/\" \\\n  | sort -u > routes_code.txt\n\n# Traffic side: aggregate real paths from access logs\nawk \"{print \\$7}\" access.log | sort -u > routes_traffic.txt\n\n# Diff: exists but unused / used but absent from code\ncomm -23 routes_code.txt routes_traffic.txt\ncomm -13 routes_code.txt routes_traffic.txt",
+            "note": "两个差集对应两类问题，都需要有人给出处置结论",
+            "title_en": "Enumerate from both sides, then diff",
+            "note_en": "The two diffs map to two problem classes, and each needs an owner decision"
+          }
+        ]
+      },
+      {
+        "h": "每一条清单项需要哪些字段",
+        "h_en": "What each inventory row needs",
+        "p": "最少六项：路径与方法、负责人、是否对外暴露、鉴权方式、最近一次被访问时间、以及是否已废弃。前五项决定风险，第六项决定能不能删。没有负责人的接口是最危险的，因为它既不归任何人管，也无法被下线。",
+        "p_en": "At minimum: path and method, owner, externally exposed or not, authentication scheme, last accessed time, and deprecated flag. The first five determine risk; the sixth decides whether deletion is safe. An ownerless endpoint is the most dangerous because nobody guards it and nobody can retire it.",
+        "code": []
+      },
+      {
+        "h": "下线比加固更彻底",
+        "h_en": "Retiring beats hardening",
+        "p": "对确认无用的接口，下线是最彻底的处置。流程上要先观察一段时间的访问量，确认趋近于零再关闭；关闭时返回明确的迁移提示而不是静默 404，让仍在调用的客户端知道去哪里。只加固不下线，等于长期维护一份没人用的攻击面，成本持续发生而收益为零。",
+        "p_en": "For endpoints confirmed unused, retirement is the most thorough fix. Observe traffic approaching zero first, then shut down with an explicit migration message rather than a silent 404 so remaining clients know where to go. Hardening without retiring means permanently maintaining an unused attack surface at ongoing cost with zero benefit.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP API9:2023 Improper Inventory Management",
+        "url": "https://api-security.owasp.org/editions/2023/en/0xa9-improper-inventory-management/"
+      },
+      {
+        "name": "OWASP API Security Top 10",
+        "url": "https://api-security.owasp.org/"
+      },
+      {
+        "name": "CWE-1059: Incomplete Documentation",
+        "url": "https://cwe.mitre.org/data/definitions/1059.html"
+      }
+    ],
+    "tags": [
+      "API",
+      "资产清单",
+      "影子接口",
+      "治理"
+    ],
+    "quiz": [
+      {
+        "q": "影子接口最常见的来源是什么？",
+        "options": [
+          "攻击者创建的",
+          "调试遗留、旧版本兼容、以及误暴露的内部服务",
+          "第三方扫描器生成的",
+          "数据库自动创建的"
+        ],
+        "answer": 1,
+        "explain": "它们的共性是缺少文档与监控，因此既不被加固也不被测试。",
+        "q_en": "What are the most common sources of shadow endpoints?",
+        "options_en": [
+          "Created by attackers",
+          "Debug leftovers, compatibility paths, and mistakenly exposed internal services",
+          "Generated by scanners",
+          "Created by the database"
+        ],
+        "explain_en": "They share a lack of documentation and monitoring, so they get neither hardening nor testing."
+      },
+      {
+        "q": "代码侧枚举与流量侧汇总的差集，能说明什么？",
+        "options": [
+          "说明系统很健康",
+          "存在但未访问可能是废弃接口，被访问但不在清单里可能是遗留或外部入口",
+          "说明日志有误",
+          "说明需要扩容"
+        ],
+        "answer": 1,
+        "explain": "两个方向各对应一类问题，都需要负责人给出处置结论。",
+        "q_en": "What do the differences between code-side and traffic-side enumeration indicate?",
+        "options_en": [
+          "The system is healthy",
+          "Exists-but-unused suggests dead routes; accessed-but-unlisted suggests legacy or external entry",
+          "The logs are wrong",
+          "More capacity is needed"
+        ],
+        "explain_en": "Each direction maps to a problem class, and each needs an owner decision."
+      },
+      {
+        "q": "对确认无用的接口，最彻底的处置方式是什么？",
+        "options": [
+          "加一层鉴权",
+          "下线，并返回明确的迁移提示",
+          "加日志监控",
+          "限制访问频率"
+        ],
+        "answer": 1,
+        "explain": "只加固不下线等于长期维护一份没人用的攻击面。",
+        "q_en": "What is the most thorough handling for a confirmed-unused endpoint?",
+        "options_en": [
+          "Add authentication",
+          "Retire it with an explicit migration message",
+          "Add monitoring",
+          "Rate limit it"
+        ],
+        "explain_en": "Hardening without retiring means maintaining an unused attack surface indefinitely."
+      }
+    ]
+  },
+  {
+    "id": "api-business-flow",
+    "kind": "lesson",
+    "category": "API 安全",
+    "cwe": "CWE-799",
+    "title": "业务流被自动化滥用",
+    "title_en": "Automated Abuse of Business Flows",
+    "level": "advanced",
+    "icon": "FLOW",
+    "color": "concurrency",
+    "summary": "接口一个都不越权、参数全部合法，但把正常的操作按自动化节奏重复一万次，业务就被打穿了。这是纯技术检测最难发现的一类。",
+    "summary_en": "No endpoint is unauthorized and every parameter is valid, yet repeating a normal action ten thousand times at machine speed breaks the business. This is the hardest class for pure technical detection.",
+    "sections": [
+      {
+        "h": "为什么它不在传统漏洞范畴里",
+        "h_en": "Why it falls outside classic vulnerabilities",
+        "p": "传统漏洞是\"做了不该做的事\"，这类是\"把允许做的事做得太多太快\"。典型场景：领优惠券接口无频率限制、评论接口没有内容质量门槛、注册接口没有设备维度约束、下单与取消可以循环刷积分。每个请求都合法，攻击在于序列与频率。",
+        "p_en": "Classic vulnerabilities are doing what you should not; this is doing what you may, too much and too fast. Typical: no coupon claim frequency limit, no content quality bar on comments, no device constraint on registration, and order-cancel loops farming points. Each request is legal; the attack is in sequence and rate.",
+        "code": []
+      },
+      {
+        "h": "识别要先于防护",
+        "h_en": "Detection precedes protection",
+        "p": "这类滥用没有统一特征，只能按业务定义\"正常用户的长什么样\"。方法是从日志里提取每个账户的关键行为序列与频率分布，找出与人群显著偏离的尾部。关键是先用数据建立基线，而不是凭直觉定阈值——直觉往往把正常重度用户当成攻击者。",
+        "p_en": "There is no universal signature. Define what a normal user looks like per business function: extract per-account action sequences and frequency distributions from logs, then find the tail that deviates from the population. Establish a data-driven baseline rather than an intuitive threshold, which tends to flag legitimate power users.",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "用行为分布找出偏离人群的账户",
+            "bad": "-- A made-up threshold: more than 100 per hour is anomalous\n-- Result: legitimate bulk importers are hit while an attacker evades at 90",
+            "good": "WITH per_user AS (\n  SELECT user_id,\n         COUNT(*)                        AS n,\n         MAX(created_at) - MIN(created_at) AS span\n  FROM coupon_claims\n  WHERE created_at >= datetime(\"now\", \"-1 day\")\n  GROUP BY user_id\n)\nSELECT user_id, n\nFROM per_user\nWHERE span < 60                       -- completed within a minute\n  AND n > (SELECT AVG(n) * 10 FROM per_user)  -- clearly outside the mean\nORDER BY n DESC;",
+            "note": "组合\"时间跨度 + 相对人群倍数\"，比固定次数更稳定，也不容易被精准卡线绕过",
+            "title_en": "Find outlier accounts from the behavioral distribution",
+            "note_en": "Combining span with a population-relative multiple is stabler and harder to evade precisely"
+          }
+        ]
+      },
+      {
+        "h": "防护手段的层次",
+        "h_en": "Layers of protection",
+        "p": "从弱到强：频率限制（最容易绕过，攻击者降速即可）、行为序列校验（要求操作顺序符合业务语义，比如必须先看到商品再下单）、业务规则约束（一次活动每账户限一次，且校验放在数据库层而不是内存）、以及成本抬升（关键动作要求更强的身份验证）。前两层是拦截，后两层是让滥用变得不划算。",
+        "p_en": "Weakest to strongest: rate limits, easily evaded by slowing down; sequence validation requiring semantically valid order, such as viewing before ordering; business rule constraints like one claim per account enforced at the database layer rather than in memory; and cost escalation requiring stronger identity for critical actions. The first two block; the last two make abuse unprofitable.",
+        "code": []
+      },
+      {
+        "h": "必须放在事务里的约束",
+        "h_en": "Constraints that must live in a transaction",
+        "p": "限领一次这类规则，如果实现成\"先查有没有领过、再插入\"，并发下两个请求可能都通过检查，于是领到两份。正确做法是让数据库的唯一约束来兜底，插入失败就视为重复。这是很实际的一条：应用层的判断永远会被并发绕过，唯一索引不会。",
+        "p_en": "A one-claim rule implemented as check-then-insert lets two concurrent requests both pass the check and claim twice. Let a database unique constraint be the backstop: a failed insert means duplicate. The lesson is concrete: application-level checks are always raced, unique indexes are not.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP API6:2023 Unrestricted Access to Sensitive Business Flows",
+        "url": "https://api-security.owasp.org/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/"
+      },
+      {
+        "name": "CWE-799: Improper Control of Interaction Frequency",
+        "url": "https://cwe.mitre.org/data/definitions/799.html"
+      },
+      {
+        "name": "OWASP Automated Threats to Web Applications",
+        "url": "https://owasp.org/www-project-automated-threats-to-web-applications/"
+      }
+    ],
+    "tags": [
+      "API",
+      "业务安全",
+      "自动化",
+      "风控"
+    ],
+    "quiz": [
+      {
+        "q": "业务流滥用为什么难以用传统漏洞检测发现？",
+        "options": [
+          "因为使用加密流量",
+          "因为每个请求都合法，滥用体现在序列与频率而非单次请求",
+          "因为来自内部网络",
+          "因为需要物理接触"
+        ],
+        "answer": 1,
+        "explain": "它不是\"做了不该做的事\"，而是\"把允许的事做得太多太快\"。",
+        "q_en": "Why is business flow abuse hard to catch with classic vulnerability detection?",
+        "options_en": [
+          "Encrypted traffic",
+          "Every request is legal; abuse shows in sequence and rate, not in a single request",
+          "It originates internally",
+          "It requires physical access"
+        ],
+        "explain_en": "It is not doing forbidden things but doing permitted things too much and too fast."
+      },
+      {
+        "q": "\"限领一次\"这类规则最可靠的实现方式是什么？",
+        "options": [
+          "在应用层先查再插入",
+          "依赖数据库唯一约束兜底，插入失败即视为重复",
+          "在内存里记一个集合",
+          "前端按钮置灰"
+        ],
+        "answer": 1,
+        "explain": "应用层判断会被并发绕过，唯一索引不会。",
+        "q_en": "What is the most reliable implementation of a one-claim rule?",
+        "options_en": [
+          "Check then insert in application code",
+          "Rely on a database unique constraint, treating a failed insert as duplicate",
+          "Keep an in-memory set",
+          "Disable the button in the frontend"
+        ],
+        "explain_en": "Application checks are raced; a unique index is not."
+      },
+      {
+        "q": "设定滥用阈值时，为什么要先建立行为分布基线？",
+        "options": [
+          "为了报表好看",
+          "否则阈值容易误伤正常重度用户，又容易被攻击者精准卡线绕过",
+          "因为法规要求",
+          "为了减少存储"
+        ],
+        "answer": 1,
+        "explain": "基线让阈值有依据，也能用相对倍数降低被卡线绕过的概率。",
+        "q_en": "Why establish a behavioral baseline before setting abuse thresholds?",
+        "options_en": [
+          "Better reports",
+          "Otherwise thresholds flag power users while attackers stay just under the line",
+          "Regulation requires it",
+          "To save storage"
+        ],
+        "explain_en": "A baseline grounds the threshold and relative multiples reduce precise evasion."
+      }
+    ]
+  },
+  {
+    "id": "api-gateway-pattern",
+    "kind": "lesson",
+    "category": "API 安全",
+    "cwe": null,
+    "title": "网关层与应用层的职责划分",
+    "title_en": "Gateway vs Application Layer Responsibilities",
+    "level": "intermediate",
+    "icon": "GW",
+    "color": "harden",
+    "summary": "网关能做认证、限流、协议校验，做不了\"这个对象是不是你的\"。把授权全推给网关，等于把最需要上下文判断的事交给了最缺上下文的组件。",
+    "summary_en": "A gateway handles authentication, rate limiting and protocol validation, but cannot decide whether an object belongs to you. Delegating all authorization there assigns context-dependent judgment to the least context-aware component.",
+    "sections": [
+      {
+        "h": "网关擅长什么",
+        "h_en": "What a gateway is good at",
+        "p": "身份断言校验（令牌是否有效、是否过期）、统一限流与配额、请求体大小与结构校验、TLS 终止、以及统一的访问日志。这些都不需要业务上下文，只看请求本身就能判断。把这部分集中到网关，好处是一致且不易遗漏。",
+        "p_en": "Validating identity assertions (is the token valid and unexpired), unified rate limiting and quotas, request size and shape validation, TLS termination, and consistent access logs. None require business context; the request alone suffices. Centralizing these yields consistency and fewer gaps.",
+        "code": []
+      },
+      {
+        "h": "网关做不了什么",
+        "h_en": "What a gateway cannot do",
+        "p": "所有需要\"数据是谁的、这个状态允不允许这个操作\"的判断。例如一个令牌对订单 A 有权限、对订单 B 没有；一个用户当前处于冻结状态所以不能下单。这些必须查业务数据，而网关通常不连业务库，即使连也不该承担这个职责。",
+        "p_en": "Anything requiring who owns the data and whether this state permits the action. A token may be valid for order A but not order B; a frozen user must not place orders. These need business data, which a gateway usually does not reach and should not be responsible for.",
+        "code": []
+      },
+      {
+        "h": "典型错误：只在网关做鉴权",
+        "h_en": "The classic mistake: authorization only at the gateway",
+        "p": "网关配置一条规则\"该路径需要有效令牌\"，看起来所有接口都被保护了。于是业务代码里普遍缺少归属校验，因为开发者认为鉴权已经在前面做完了。实际情况是网关只验证了\"你是谁\"，从没验证\"你能不能\"。这个误解是大量越权漏洞的根源。",
+        "p_en": "One gateway rule requiring a valid token for a path makes every endpoint look protected. Business code then commonly omits ownership checks because developers believe authentication already happened. In reality the gateway verified who you are, never what you may do. This misunderstanding underlies many authorization bugs.",
+        "code": [
+          {
+            "lang": "yaml",
+            "title": "职责划分：网关管入口，应用管授权",
+            "bad": "# The gateway has one require-token rule, so the business layer is assumed safe\nroutes:\n  - path: /api/orders/**\n    auth: required\n# Result: any logged-in user can read other orders",
+            "good": "# Gateway: auth, rate limit, size cap (no business context)\nroutes:\n  - path: /api/orders/**\n    auth: required\n    rate_limit: { per_account: 60, per_minute: true }\n    max_body: 64kb\n\n# Application: ownership on every access (needs business context)\n#   SELECT ... WHERE id = ? AND owner_id = ?\n# The gateway cannot replace this layer; it has no owner_id",
+            "note": "判断标准很简单：这条规则需要查业务数据吗？需要，就属于应用层",
+            "title_en": "Split duties: gateway at the edge, application for authorization",
+            "note_en": "The test is simple: does the rule need business data? Then it belongs in the application"
+          }
+        ]
+      },
+      {
+        "h": "怎么验证划分是否正确",
+        "h_en": "How to verify the split is right",
+        "p": "做一次\"绕过网关\"的思维实验：假设攻击者能直接访问应用服务（内网横向移动后很常见），现在的防护还有效吗？如果答案是否定的，说明关键判断被放在了网关。这个实验很有价值，因为它把\"假设边界没被突破\"这个隐含前提显式化了。纵深防御的意义就在于去掉这个假设后仍然有效。",
+        "p_en": "Run a bypass-the-gateway thought experiment: if an attacker reaches the application service directly, common after lateral movement, does protection still hold? If not, critical checks sit in the gateway. This experiment is valuable because it makes the implicit assumption of an unbreached boundary explicit; defense in depth means still working without that assumption.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP API Security Top 10",
+        "url": "https://api-security.owasp.org/"
+      },
+      {
+        "name": "OWASP Authorization Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+      },
+      {
+        "name": "OWASP ASVS",
+        "url": "https://owasp.org/www-project-application-security-verification-standard/"
+      }
+    ],
+    "tags": [
+      "API",
+      "网关",
+      "授权",
+      "架构"
+    ],
+    "quiz": [
+      {
+        "q": "网关最不适合承担哪一类判断？",
+        "options": [
+          "令牌是否有效",
+          "这个对象是否属于当前用户",
+          "请求体是否超过上限",
+          "请求频率是否超限"
+        ],
+        "answer": 1,
+        "explain": "归属判断需要业务数据上下文，而网关通常拿不到这些数据。",
+        "q_en": "Which judgment is least suited to a gateway?",
+        "options_en": [
+          "Whether a token is valid",
+          "Whether an object belongs to the current user",
+          "Whether the body exceeds a limit",
+          "Whether the rate is exceeded"
+        ],
+        "explain_en": "Ownership requires business data context that a gateway typically does not have."
+      },
+      {
+        "q": "\"网关已配置需要令牌\"这条规则能保证什么？",
+        "options": [
+          "保证用户只能访问自己的数据",
+          "只保证调用方身份有效，不保证其有权访问该对象",
+          "保证接口无漏洞",
+          "保证日志完整"
+        ],
+        "answer": 1,
+        "explain": "认证回答\"你是谁\"，授权回答\"你能不能\"，这是两件事。",
+        "q_en": "What does a gateway rule requiring a token actually guarantee?",
+        "options_en": [
+          "Users only access their own data",
+          "Only that the caller identity is valid, not that it may access this object",
+          "The endpoint is free of bugs",
+          "Logs are complete"
+        ],
+        "explain_en": "Authentication answers who you are; authorization answers what you may do. They are distinct."
+      },
+      {
+        "q": "\"绕过网关\"思维实验的价值是什么？",
+        "options": [
+          "测试网关性能",
+          "检验关键判断是否被错误地只放在网关，去掉边界假设后防护是否仍成立",
+          "验证证书链",
+          "评估带宽"
+        ],
+        "answer": 1,
+        "explain": "内网横向移动后直连应用服务很常见，纵深防御要在这个前提下依然有效。",
+        "q_en": "What is the value of the bypass-the-gateway thought experiment?",
+        "options_en": [
+          "Testing gateway performance",
+          "Checking whether critical checks sit only in the gateway, so protection survives without the boundary assumption",
+          "Validating certificate chains",
+          "Estimating bandwidth"
+        ],
+        "explain_en": "Direct access to app services after lateral movement is common; defense in depth must still hold then."
+      }
+    ]
+  }
+]

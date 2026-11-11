@@ -1,0 +1,872 @@
+[
+  {
+    "id": "ti-cyber-kill-chain",
+    "kind": "lesson",
+    "category": "威胁情报",
+    "cwe": null,
+    "title": "杀伤链与 MITRE ATT&CK",
+    "title_en": "Kill Chain and ATT&CK",
+    "level": "intermediate",
+    "icon": "KC",
+    "color": "ir",
+    "summary": "理解攻击的阶段性，才能知道「现在被突破到第几步」以及「还来得及在哪一步拦住」。",
+    "summary_en": "Understanding attack stages tells you how far an intrusion has gone and where to block it.",
+    "sections": [
+      {
+        "h": "杀伤链的六个环节",
+        "p": "侦察（收集目标信息）→ 武器化（构造载荷）→ 投递（送达目标）→ 利用（触发漏洞）→ 安装（建立驻留）→ 指挥控制（建立通道）→ 目标达成（窃取/破坏）。这条链的价值在于：任何一环被切断，攻击就失败。防御不必追求全拦，只需在成本最低的环节拦住。",
+        "h_en": "The six kill chain stages",
+        "p_en": "Reconnaissance (gathering target information), weaponization (crafting the payload), delivery (getting it to the target), exploitation (triggering the vulnerability), installation (establishing persistence), command and control (building a channel), and objectives (theft or destruction). The value of the chain is that breaking any link defeats the attack; defense need not block everything, only the cheapest link."
+      },
+      {
+        "h": "ATT&CK 的视角",
+        "p": "ATT&CK 把攻击手法按「战术」组织（初始访问、执行、持久化、提权、防御规避、凭据访问、发现、横向移动、收集、指挥控制、外传、影响），每个战术下有具体技术编号。它的价值是让「我们能不能检测到这个技术」变成可逐条核对的问题。",
+        "h_en": "The ATT&CK view",
+        "p_en": "ATT&CK organizes techniques by tactic (initial access, execution, persistence, privilege escalation, defense evasion, credential access, discovery, lateral movement, collection, command and control, exfiltration, impact), each with specific technique IDs. Its value is turning can we detect this technique into a checkable question."
+      },
+      {
+        "h": "两者的分工",
+        "p": "杀伤链讲的是「攻击进行到哪一步」，偏线性叙事，适合与管理层沟通。ATT&CK 讲的是「攻击用了哪些具体手法」，可枚举可覆盖，适合与检测工程对接。实战中常用杀伤链定阶段、用 ATT&CK 定检测缺口。",
+        "h_en": "Division of labor",
+        "p_en": "The kill chain describes how far an attack has progressed, a linear narrative suited to management. ATT&CK describes which specific techniques were used, enumerable and coverable, suited to detection engineering. In practice the kill chain sets the stage and ATT&CK sets the detection gap."
+      },
+      {
+        "h": "如何用于评估",
+        "p": "把你的日志与告警逐条映射到 ATT&CK 技术：哪些技术有告警、哪些只有日志、哪些完全无感知。产出是一张覆盖度热力图，缺口就是下一阶段的建设重点。",
+        "h_en": "Using it for assessment",
+        "p_en": "Map your logs and alerts to ATT&CK techniques: which have alerts, which only have logs, and which are invisible. The output is a coverage heatmap where gaps define the next build priority."
+      },
+      {
+        "h": "常见误用",
+        "p": "把 ATT&CK 当成合规清单逐条打勾，而不考虑自己的资产与威胁模型；或者只做检测不做阻断，导致告警很多但拦不住。覆盖度要看「能否在合理时间内发现并响应」，不是「有没有规则」。",
+        "h_en": "Common misuse",
+        "p_en": "Treating ATT&CK as a compliance checklist without regard to your assets and threat model, or detecting without blocking so alerts pile up but nothing is stopped. Coverage means detection and response within a reasonable time, not whether a rule exists."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE ATT&CK",
+        "url": "https://attack.mitre.org/"
+      },
+      {
+        "name": "Lockheed Martin Cyber Kill Chain",
+        "url": "https://www.lockheedmartin.com/en-us/capabilities/cyber/cyber-kill-chain.html"
+      }
+    ],
+    "tags": [
+      "威胁情报",
+      "方法论"
+    ],
+    "quiz": [
+      {
+        "q": "杀伤链的核心价值是？",
+        "options": [
+          "描述攻击者心理",
+          "任何一环被切断，攻击即失败",
+          "统计漏洞数量",
+          "评估损失金额"
+        ],
+        "answer": 1,
+        "explain": "防御只需在最经济的那一环拦住。",
+        "q_en": "Core value of the kill chain?",
+        "options_en": [
+          "Describes attacker psychology",
+          "Breaking any link defeats the attack",
+          "Counts vulnerabilities",
+          "Estimates loss"
+        ],
+        "explain_en": "Defense only needs the most economical link."
+      },
+      {
+        "q": "ATT&CK 与杀伤链的分工是？",
+        "options": [
+          "两者完全相同",
+          "杀伤链定阶段，ATT&CK 定具体手法与检测缺口",
+          "ATT&CK 更简单易懂",
+          "杀伤链更新更频繁"
+        ],
+        "answer": 1,
+        "explain": "一个用于叙事沟通，一个用于工程落地。",
+        "q_en": "Division of labor between ATT&CK and the kill chain?",
+        "options_en": [
+          "They are identical",
+          "The kill chain sets stages; ATT&CK sets techniques and detection gaps",
+          "ATT&CK is simpler",
+          "The kill chain updates more often"
+        ],
+        "explain_en": "One is for narrative communication, the other for engineering."
+      },
+      {
+        "q": "把 ATT&CK 当合规清单逐条打勾的问题？",
+        "options": [
+          "执行太慢",
+          "脱离自身资产与威胁模型，覆盖度失真",
+          "规则数量太多",
+          "采购成本高"
+        ],
+        "answer": 1,
+        "explain": "覆盖度要看能否及时发现并响应，而非有没有规则。",
+        "q_en": "Problem with treating ATT&CK as a compliance checklist?",
+        "options_en": [
+          "Too slow",
+          "Disconnected from your assets and threat model, coverage becomes distorted",
+          "Too many rules",
+          "High cost"
+        ],
+        "explain_en": "Coverage means timely detection and response."
+      }
+    ]
+  },
+  {
+    "id": "ti-ioc-ttp",
+    "kind": "lesson",
+    "category": "威胁情报",
+    "cwe": null,
+    "title": "IOC 与 TTP：哪个更值钱",
+    "title_en": "IOC vs TTP",
+    "level": "intermediate",
+    "icon": "IOC",
+    "color": "ir",
+    "summary": "IOC 是「这次攻击用了什么」，TTP 是「这类攻击怎么打」。前者会失效，后者能复用。",
+    "summary_en": "IOCs describe this attack; TTPs describe how this class of attack works.",
+    "sections": [
+      {
+        "h": "IOC 的特点",
+        "p": "IOC 是具体可观测的痕迹：IP、域名、文件哈希、注册表键、User-Agent 字符串。优点是可直接用于封禁与扫描，缺点是生命周期短——攻击者换个域名、改一个字节，哈希就变了。所以 IOC 适合「追这批攻击」，不适合「建长期防线」。",
+        "h_en": "Characteristics of IOCs",
+        "p_en": "IOCs are concrete observable traces: IPs, domains, file hashes, registry keys, user agent strings. They are directly usable for blocking and scanning but have short lifetimes; an attacker changing a domain or one byte invalidates a hash. IOCs suit chasing this campaign, not building a durable defense."
+      },
+      {
+        "h": "TTP 的特点",
+        "p": "TTP 是攻击者的行为模式：用什么方式建立持久化、用什么工具做横向移动、用哪种方式外传数据。它变化慢，一次投入可复用很久。缺点是抽象，需要落到具体检测逻辑上才有用。",
+        "h_en": "Characteristics of TTPs",
+        "p_en": "TTPs are attacker behavior patterns: how persistence is established, which tools are used for lateral movement, how data is exfiltrated. They change slowly and one investment is reusable for a long time. The downside is abstraction; they must be translated into concrete detection logic to be useful."
+      },
+      {
+        "h": "正确的关系",
+        "p": "从 IOC 提炼 TTP：看到一个恶意哈希，追问「它是怎么被执行起来的」；看到一批恶意域名，追问「它们用的是哪种 C2 协议」。把个案上升为模式，才是一次情报的真正价值。",
+        "h_en": "The right relationship",
+        "p_en": "Derive TTPs from IOCs: seeing a malicious hash, ask how it was executed; seeing a batch of malicious domains, ask which C2 protocol they use. Elevating a case into a pattern is the real value of intelligence."
+      },
+      {
+        "h": "情报的时效分级",
+        "p": "战略级（攻击者画像、行业趋势，月级）→ 战术级（TTP，周级）→ 操作级（具体 IOC，小时到天级）。越往下越具体也越短命。做检测要以战术级为主干、操作级为补充。",
+        "h_en": "Intelligence timescales",
+        "p_en": "Strategic (attacker profiles, industry trends, monthly), tactical (TTPs, weekly), and operational (specific IOCs, hourly to daily). The lower you go, the more concrete and the shorter lived. Build detection on the tactical level with operational data as supplement."
+      },
+      {
+        "h": "落地建议",
+        "p": "IOC 进阻断列表但要设过期时间；TTP 进检测规则并定期评审。不要只收集不消费——很多团队囤了大量情报源，实际用上的不到一成。",
+        "h_en": "Practical advice",
+        "p_en": "Put IOCs into blocklists with expiry; put TTPs into detection rules with periodic review. Do not collect without consuming: many teams hoard feed subscriptions and use under a tenth."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE ATT&CK",
+        "url": "https://attack.mitre.org/"
+      },
+      {
+        "name": "ENISA Threat Landscape",
+        "url": "https://www.enisa.europa.eu/topics/cyber-threats/threat-landscape"
+      }
+    ],
+    "tags": [
+      "威胁情报",
+      "方法论"
+    ],
+    "quiz": [
+      {
+        "q": "IOC 的主要局限是？",
+        "options": [
+          "不容易收集",
+          "生命周期短，攻击者稍作改动即失效",
+          "需要付费购买",
+          "格式不统一"
+        ],
+        "answer": 1,
+        "explain": "所以不能只靠 IOC 建长期防线。",
+        "q_en": "Main limitation of IOCs?",
+        "options_en": [
+          "Hard to collect",
+          "Short lifetime; slight attacker changes invalidate them",
+          "Requires payment",
+          "Inconsistent formats"
+        ],
+        "explain_en": "You cannot build a durable defense on IOCs alone."
+      },
+      {
+        "q": "从 IOC 提炼 TTP 的典型例子是？",
+        "options": [
+          "把 IP 加进黑名单",
+          "看到恶意哈希后追问它如何被执行起来",
+          "上报给监管",
+          "归档留证"
+        ],
+        "answer": 1,
+        "explain": "把个案上升为模式，才是一次情报的真正价值。",
+        "q_en": "Typical example of deriving a TTP from an IOC?",
+        "options_en": [
+          "Blocking an IP",
+          "Asking how a malicious hash was executed",
+          "Adding to a blacklist",
+          "Reporting to regulators"
+        ],
+        "explain_en": "Elevate cases into patterns."
+      },
+      {
+        "q": "检测体系应以哪一级情报为主干？",
+        "options": [
+          "操作级 IOC",
+          "战术级 TTP",
+          "战略级行业报告",
+          "都不需要"
+        ],
+        "answer": 1,
+        "explain": "TTP 变化慢、可复用，适合做主干。",
+        "q_en": "Which intelligence level should anchor detection?",
+        "options_en": [
+          "Operational IOCs",
+          "Tactical TTPs",
+          "Strategic industry reports",
+          "None"
+        ],
+        "explain_en": "TTPs change slowly and are reusable."
+      }
+    ]
+  },
+  {
+    "id": "ti-false-positive",
+    "kind": "lab",
+    "category": "威胁情报",
+    "cwe": null,
+    "title": "告警降噪：从一万条到十条",
+    "title_en": "Alert Triage: From 10,000 to 10",
+    "level": "advanced",
+    "icon": "NOISE",
+    "color": "ir",
+    "summary": "告警太多等于没有告警。降噪不是关规则，而是提高单条告警的信息密度。",
+    "summary_en": "Too many alerts means no alerts. Reduce noise by enriching signals, not by disabling rules.",
+    "sections": [
+      {
+        "h": "第一步 量化现状",
+        "p": "统计每个规则的触发量、误报率、平均处置时长。找出「触发量前 20% 但从未导致真实事件」的规则，它们贡献了绝大部分噪声。",
+        "h_en": "Step one: quantify the status quo",
+        "p_en": "Measure per rule: trigger volume, false positive rate, and mean handling time. Identify rules in the top 20 percent of volume that never produced a real incident; they account for most of the noise."
+      },
+      {
+        "h": "第二步 加环境上下文",
+        "p": "单条告警往往不足以判断。补上：资产重要性（这台机器是不是核心）、账号属性（是不是服务账号）、历史行为（这个 IP 平时有没有访问过）、时间模式（是否在业务低峰）。上下文能把误报直接过滤掉一大半。",
+        "h_en": "Step two: add environment context",
+        "p_en": "A single alert is often insufficient. Add asset criticality (is this a core host), account attributes (is this a service account), historical behavior (has this IP visited before), and time patterns (is it off-peak). Context filters out a large share of false positives outright."
+      },
+      {
+        "h": "第三步 关联聚合",
+        "p": "把同一主机、同一账号在时间窗内的多条告警聚合成一个「事件」而不是分别派单。这既降低数量，也提升可读性——分析员看到的是「这台机器 10 分钟内出现了 5 个异常」，而不是 5 张孤立的工单。",
+        "h_en": "Step three: correlated aggregation",
+        "p_en": "Combine multiple alerts on the same host or account within a time window into one event rather than separate tickets. This reduces volume and improves readability: the analyst sees five anomalies on one host in ten minutes rather than five isolated tickets."
+      },
+      {
+        "h": "第四步 分级与 SLA",
+        "p": "按「是否已确认失陷」「资产是否核心」分级。高危必须人工确认，低危可自动关闭并留档。没有分级制度，所有告警都会被同等对待，最终全部被忽略。",
+        "h_en": "Step four: tiering and SLAs",
+        "p_en": "Tier by confirmed compromise and asset criticality. High risk requires human confirmation; low risk can auto-close with records. Without tiering everything is treated equally and ultimately ignored."
+      },
+      {
+        "h": "第五步 反馈闭环",
+        "p": "每条告警的处置结论（真/假/待查）要回写到规则，作为下一轮调优的依据。没有反馈的规则会一直吵下去。",
+        "h_en": "Step five: feedback loop",
+        "p_en": "Write disposition conclusions (true, false, pending) back into the rule as input for the next tuning round. Rules without feedback keep making noise forever."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE ATT&CK Detection",
+        "url": "https://attack.mitre.org/"
+      },
+      {
+        "name": "NIST SP 800-137",
+        "url": "https://csrc.nist.gov/pubs/sp/800/137/final"
+      }
+    ],
+    "tags": [
+      "威胁情报",
+      "运营",
+      "实战"
+    ],
+    "quiz": [
+      {
+        "q": "告警降噪的第一步应该是？",
+        "options": [
+          "先关掉最吵的规则",
+          "量化每条的触发量、误报率与处置时长",
+          "立刻增加人手",
+          "采购新工具"
+        ],
+        "answer": 1,
+        "explain": "先看清现状再动手，否则容易关错。",
+        "q_en": "First step in alert noise reduction?",
+        "options_en": [
+          "Disable the noisiest rules",
+          "Measure trigger volume, false positive rate, and handling time per rule",
+          "Add headcount",
+          "Buy new tools"
+        ],
+        "explain_en": "Understand the status quo before acting."
+      },
+      {
+        "q": "加环境上下文为什么能降噪？",
+        "options": [
+          "让告警界面更好看",
+          "资产重要性、账号属性等信息能直接排除大量误报",
+          "减少日志存储",
+          "提升查询性能"
+        ],
+        "answer": 1,
+        "explain": "孤立的一条告警信息往往不足以判断。",
+        "q_en": "Why does environment context reduce noise?",
+        "options_en": [
+          "Better looking alerts",
+          "Asset criticality and account attributes exclude many false positives outright",
+          "Fewer logs",
+          "Better performance"
+        ],
+        "explain_en": "Isolated alerts lack decision information."
+      },
+      {
+        "q": "没有反馈闭环的检测规则会怎样？",
+        "options": [
+          "自动优化变准",
+          "一直产生同样的噪声",
+          "自动失效消失",
+          "被系统回收"
+        ],
+        "answer": 1,
+        "explain": "处置结论必须回写规则，否则永远不会调优。",
+        "q_en": "What happens to rules without a feedback loop?",
+        "options_en": [
+          "They self-optimize",
+          "They keep generating the same noise",
+          "They disappear",
+          "They improve"
+        ],
+        "explain_en": "Dispositions must be written back into rules."
+      }
+    ]
+  },
+  {
+    "id": "ti-threat-model",
+    "kind": "lab",
+    "category": "威胁情报",
+    "cwe": null,
+    "title": "给一个系统做威胁建模",
+    "title_en": "Threat Modeling a System",
+    "level": "advanced",
+    "icon": "TM",
+    "color": "ir",
+    "summary": "在设计阶段就找出「谁会怎么攻击我们」，比上线后再补要便宜一个数量级。",
+    "summary_en": "Finding who will attack how, before coding, costs an order of magnitude less.",
+    "sections": [
+      {
+        "h": "第一步 画数据流图",
+        "p": "标出所有外部实体、进程、数据存储、数据流，以及信任边界（跨边界的地方就是攻击面）。不要追求精细，一张能说清「数据从哪来、经过谁、存到哪」的图就够。",
+        "h_en": "Step one: draw a data flow diagram",
+        "p_en": "Mark all external entities, processes, data stores, data flows, and trust boundaries (crossing a boundary is attack surface). Do not over-detail; a diagram showing where data comes from, passes through, and rests is enough."
+      },
+      {
+        "h": "第二步 明确资产与威胁主体",
+        "p": "哪些数据被泄露后果最严重（凭据、个人信息、密钥）。谁会来攻击：自动化扫描的脚本小子、有组织的犯罪团伙、内部人员。不同主体的能力与动机决定了你需要防到什么程度。",
+        "h_en": "Step two: define assets and threat actors",
+        "p_en": "Which data is most damaging if leaked (credentials, personal data, keys). Who will attack: automated scanners, organized crime, or insiders. Different actors have different capabilities and motives, determining how far you must defend."
+      },
+      {
+        "h": "第三步 用 STRIDE 逐环节提问",
+        "p": "假冒（能否冒充身份）、篡改（数据能否被改）、否认（操作能否被抵赖）、信息泄露（数据会不会外泄）、拒绝服务（能否被打挂）、提权（能否越权）。对每个信任边界都过一遍这六问。",
+        "h_en": "Step three: ask STRIDE at each hop",
+        "p_en": "Spoofing (can identity be forged), tampering (can data be altered), repudiation (can actions be denied), information disclosure (can data leak), denial of service (can it be taken down), and elevation of privilege (can rights be exceeded). Run these six questions across every trust boundary."
+      },
+      {
+        "h": "第四步 排序与处置",
+        "p": "按「可能性 × 影响」排序，选前 5–10 项给出具体处置：加控制、改设计、接受风险（并记录理由）。不要试图全部解决——那等于什么都没解决。",
+        "h_en": "Step four: rank and treat",
+        "p_en": "Sort by likelihood times impact and pick the top five to ten items with concrete treatment: add a control, change the design, or accept the risk with recorded rationale. Do not attempt to solve everything, which solves nothing."
+      },
+      {
+        "h": "第五步 复核",
+        "p": "架构变更后重新评估。威胁建模不是一次性文档，而是随系统演进的活清单。建议每次大版本迭代时过一遍。",
+        "h_en": "Step five: review",
+        "p_en": "Reassess after architecture changes. Threat modeling is not a one-time document but a living list evolving with the system. Review it at each major release."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Threat Modeling",
+        "url": "https://owasp.org/www-community/Threat_Modeling"
+      },
+      {
+        "name": "Microsoft STRIDE",
+        "url": "https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats"
+      }
+    ],
+    "tags": [
+      "威胁建模",
+      "架构",
+      "实战"
+    ],
+    "quiz": [
+      {
+        "q": "威胁建模最该关注数据流图的哪部分？",
+        "options": [
+          "节点数量",
+          "跨信任边界的数据流",
+          "配色方案",
+          "文件大小"
+        ],
+        "answer": 1,
+        "explain": "信任边界即攻击面。",
+        "q_en": "Which part of the data flow diagram matters most?",
+        "options_en": [
+          "Node count",
+          "Data flows crossing trust boundaries",
+          "Color scheme",
+          "File size"
+        ],
+        "explain_en": "Boundaries are attack surface."
+      },
+      {
+        "q": "STRIDE 的六个维度不包括？",
+        "options": [
+          "假冒",
+          "篡改",
+          "加密",
+          "提权"
+        ],
+        "answer": 2,
+        "explain": "加密是手段，不是威胁类型。",
+        "q_en": "Which is NOT one of STRIDE?",
+        "options_en": [
+          "Spoofing",
+          "Tampering",
+          "Encryption",
+          "Elevation of privilege"
+        ],
+        "explain_en": "Encryption is a control, not a threat type."
+      },
+      {
+        "q": "威胁建模的正确心态是？",
+        "options": [
+          "一次做完并全部解决",
+          "按可能性与影响排序，解决前几项并记录已接受的其余风险",
+          "只产出一份文档",
+          "上线之后再补做"
+        ],
+        "answer": 1,
+        "explain": "试图全部解决等于什么都没解决。",
+        "q_en": "Correct mindset for threat modeling?",
+        "options_en": [
+          "Solve everything in one pass",
+          "Rank by likelihood and impact, fix the top items, record accepted risks",
+          "Produce a document only",
+          "Do it after launch"
+        ],
+        "explain_en": "Trying to solve everything solves nothing."
+      }
+    ]
+  },
+  {
+    "id": "ops-patch",
+    "kind": "lab",
+    "category": "安全运营",
+    "cwe": "CWE-1104",
+    "title": "补丁管理：从公告到闭环",
+    "title_en": "Patch Management End to End",
+    "level": "intermediate",
+    "icon": "PATCH",
+    "color": "process",
+    "summary": "补丁管理的难点不在打，在「知道哪些资产需要打」和「确认真的打上了」。",
+    "sections": [
+      {
+        "h": "第一步 资产与版本盘点",
+        "p": "没有准确清单，补丁管理无从谈起。清单至少要含：软件名、版本、部署位置、负责人、是否暴露在公网。自动采集优于人工填报，但必须有人对准确性负责。",
+        "h_en": "Step one: asset and version inventory",
+        "p_en": "Without an accurate inventory, patch management cannot begin. At minimum record software name, version, deployment location, owner, and internet exposure. Automated collection beats manual entry, but someone must own accuracy."
+      },
+      {
+        "h": "第二步 公告匹配",
+        "p": "把漏洞公告的受影响范围与清单比对。注意版本号规则差异、分支差异、以及「间接依赖」——很多组件是通过框架或镜像带进来的，不在直接清单里。",
+        "h_en": "Step two: advisory matching",
+        "p_en": "Compare advisory affected ranges against the inventory. Watch for version numbering rules, branch differences, and indirect dependencies: many components arrive through frameworks or images and are absent from the direct list."
+      },
+      {
+        "h": "第三步 优先级排序",
+        "p": "不是所有高危都要立即打。排序依据：是否在野利用（KEV）、是否公网可达、是否有可行的缓解措施、打补丁的业务影响。四者结合给出「立即/本周/本周期/常规」四档。",
+        "h_en": "Step three: prioritize",
+        "p_en": "Not every high severity patches immediately. Rank by active exploitation (KEV), internet reachability, available mitigations, and business impact of patching. Combine all four into immediate, this week, this cycle, and routine tiers."
+      },
+      {
+        "h": "第四步 分批灰度",
+        "p": "先测试环境、再小范围生产、最后全量。每批观察一段时间的功能与性能指标。关键业务要准备好回滚方案，否则一次失败的补丁可能比漏洞本身影响更大。",
+        "h_en": "Step four: staged rollout",
+        "p_en": "Test environment first, then a small production slice, then full rollout. Observe functionality and performance between batches. Critical systems need rollback plans, since a failed patch can hurt more than the vulnerability."
+      },
+      {
+        "h": "第五步 验证闭环",
+        "p": "打完必须验证：版本号已变、漏洞特征消失、功能未回归。把验证结果写回记录。未验证的「已修复」在审计时等于没修。",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "验证版本已更新",
+            "bad": "# Consider patching done with no verification",
+            "good": "dpkg -l | grep openssl         # confirm the version\nopenssl version -a            # confirm the runtime version\ncurl -sI https://host/ | grep -i server  # confirm the service reloaded the new library",
+            "note": "三个维度：包版本、运行时版本、服务是否已加载",
+            "title_en": "Verify the version was updated",
+            "note_en": "Three dimensions: package version, runtime version, and whether the service loaded it"
+          }
+        ],
+        "h_en": "Step five: verify closure",
+        "p_en": "After patching, verify: the version changed, the vulnerability signature is gone, and functionality did not regress. Write results back into records. Unverified fixed equals unfixed at audit time."
+      },
+      {
+        "h": "无法及时打补丁时",
+        "p": "启用补偿性控制：WAF 规则、访问限制、关闭相关功能、加强监控。必须记录补偿措施的负责人与有效期，到期前重新评估。长期挂着「临时缓解」等于没有管理。",
+        "h_en": "When patching cannot happen in time",
+        "p_en": "Enable compensating controls: WAF rules, access restrictions, disabling the feature, or increased monitoring. Record the owner and validity period and reassess before expiry. Standing temporary mitigations mean no management."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-40 Rev.4",
+        "url": "https://csrc.nist.gov/pubs/sp/800/40/r4/final"
+      },
+      {
+        "name": "MITRE CWE-1104",
+        "url": "https://cwe.mitre.org/data/definitions/1104.html"
+      }
+    ],
+    "tags": [
+      "安全运营",
+      "补丁",
+      "流程"
+    ],
+    "quiz": [
+      {
+        "q": "补丁管理最难的部分是？",
+        "options": [
+          "执行安装",
+          "知道哪些资产需要打，并确认真的打上了",
+          "下载补丁包",
+          "撰写报告"
+        ],
+        "answer": 1,
+        "explain": "资产盘点与验证闭环是两大难点。",
+        "q_en": "Hardest part of patch management?",
+        "options_en": [
+          "Executing installs",
+          "Knowing which assets need patching and confirming it was applied",
+          "Downloading patches",
+          "Writing reports"
+        ],
+        "explain_en": "Inventory and verification are the two hard parts."
+      },
+      {
+        "q": "补丁优先级排序应考虑？",
+        "options": [
+          "只看 CVSS 分值",
+          "是否在野利用、是否公网可达、缓解措施与业务影响",
+          "只看发布时间",
+          "只看厂商推荐等级"
+        ],
+        "answer": 1,
+        "explain": "多因素结合才能得出可执行的四档优先级。",
+        "q_en": "What should patch priority consider?",
+        "options_en": [
+          "CVSS score alone",
+          "Active exploitation, internet reachability, mitigations, and business impact",
+          "Publication date only",
+          "Vendor recommendation only"
+        ],
+        "explain_en": "Multiple factors combined produce actionable tiers."
+      },
+      {
+        "q": "未验证的「已修复」意味着？",
+        "options": [
+          "确实已经修好",
+          "在审计中等同于没修",
+          "可以忽略不管",
+          "需要重新扫描一次"
+        ],
+        "answer": 1,
+        "explain": "闭环必须包含验证这一步。",
+        "q_en": "What does unverified fixed mean?",
+        "options_en": [
+          "Fixed for sure",
+          "Equivalent to unfixed at audit time",
+          "Safe to ignore",
+          "Requires rescan"
+        ],
+        "explain_en": "Closure must include verification."
+      }
+    ],
+    "summary_en": "Patch management is the highest-return routine work: knowing which systems run which versions, and shortening the time from a fix being published to it being deployed. Prioritize anything already exploited in the wild."
+  },
+  {
+    "id": "ops-log",
+    "kind": "lab",
+    "category": "安全运营",
+    "cwe": "CWE-778",
+    "title": "日志与检测：先有日志再谈检测",
+    "title_en": "Logging Before Detection",
+    "level": "intermediate",
+    "icon": "LOG2",
+    "color": "process",
+    "summary": "绝大多数「检测不到」的问题，根因是日志根本没记，而不是规则写得不好。",
+    "sections": [
+      {
+        "h": "该记什么",
+        "p": "认证事件（成功与失败、来源 IP）、权限变更、数据访问（尤其是批量导出）、配置修改、进程创建（含命令行）、网络连接（出站目标）。这几类是绝大多数攻击链的必经之路。",
+        "h_en": "What to log",
+        "p_en": "Authentication events (success and failure, source IP), privilege changes, data access (especially bulk export), configuration changes, process creation (with command line), and network connections (outbound destination). These cover the path of most attack chains."
+      },
+      {
+        "h": "记在哪、留多久",
+        "p": "本地日志容易被攻击者清理，必须外发到独立的日志系统并做只写权限。留存周期按合规要求与排障需求定，通常 90 天在线 + 1 年归档是常见基线。",
+        "h_en": "Where and how long",
+        "p_en": "Local logs are easily wiped by attackers, so forward them to an independent logging system with write-only permissions. Retention follows compliance and troubleshooting needs; a common baseline is 90 days online plus one year archived."
+      },
+      {
+        "h": "日志本身的安全",
+        "p": "日志会包含敏感信息（账号、IP、有时甚至凭据），必须做脱敏与访问控制。日志系统被攻破等于把整个内网的运行细节交给对方。",
+        "h_en": "Security of the logs themselves",
+        "p_en": "Logs contain sensitive information (accounts, IPs, sometimes credentials), requiring redaction and access control. A compromised logging system hands over the operational details of the entire network."
+      },
+      {
+        "h": "从日志到检测",
+        "p": "有日志不等于有检测。需要显式定义：什么模式算异常、触发后谁看、看到后做什么。没有后两步的「检测」只是一堆没人看的文件。",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "一个最小的检测逻辑",
+            "bad": "# Collect without detecting: logs sit in files unread",
+            "good": "# Rule: more than 10 failed logins for one account within 5 minutes\nawk '/Failed password/ {print $9, $11}' /var/log/auth.log | \\\n  sort | uniq -c | awk '$1 > 10 {print \"ALERT:\", $2, $3, $1}'",
+            "note": "检测规则要能落到可执行的查询上",
+            "title_en": "A minimal detection rule",
+            "note_en": "Detection rules must land on an executable query"
+          }
+        ],
+        "h_en": "From logs to detection",
+        "p_en": "Having logs is not having detection. Explicitly define what pattern is anomalous, who looks when it fires, and what they do. Detection without those last two steps is a pile of files nobody reads."
+      },
+      {
+        "h": "常见缺口",
+        "p": "只记了 Web 访问日志，没记系统层；只记成功，不记失败；进程创建日志缺失（很多 Linux 发行版默认不记命令行）；日志时间不同步导致无法关联。",
+        "h_en": "Common gaps",
+        "p_en": "Only web access logs but no system layer; only successes but no failures; process creation logging missing (many Linux distributions do not log command lines by default); unsynchronized timestamps preventing correlation."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-778",
+        "url": "https://cwe.mitre.org/data/definitions/778.html"
+      },
+      {
+        "name": "NIST SP 800-92",
+        "url": "https://csrc.nist.gov/pubs/sp/800/92/final"
+      }
+    ],
+    "tags": [
+      "安全运营",
+      "日志",
+      "检测"
+    ],
+    "quiz": [
+      {
+        "q": "「检测不到攻击」最常见的原因是？",
+        "options": [
+          "规则写得不够好",
+          "日志根本没记",
+          "算力不足",
+          "工具不够先进"
+        ],
+        "answer": 1,
+        "explain": "先解决有无，再谈好坏。",
+        "q_en": "Most common cause of detection failure?",
+        "options_en": [
+          "Poor rules",
+          "Logs are simply not recorded",
+          "Insufficient compute",
+          "Poor tooling"
+        ],
+        "explain_en": "Solve presence before quality."
+      },
+      {
+        "q": "日志为什么必须外发到独立系统？",
+        "options": [
+          "节省本地磁盘空间",
+          "本地日志容易被攻击者清理，外发并只写是留证前提",
+          "提升查询速度",
+          "仅仅为了满足合规"
+        ],
+        "answer": 1,
+        "explain": "攻击者得手后第一件事往往是清日志。",
+        "q_en": "Why must logs be forwarded to an independent system?",
+        "options_en": [
+          "Save local disk",
+          "Local logs are easily wiped; forwarding with write-only is the premise of evidence",
+          "Faster queries",
+          "Compliance only"
+        ],
+        "explain_en": "Attackers clear logs first after success."
+      },
+      {
+        "q": "有日志就等于有检测吗？",
+        "options": [
+          "等于",
+          "不等于，还需要定义异常模式、响应人与处置动作",
+          "取决于使用什么工具",
+          "取决于日志数据量"
+        ],
+        "answer": 1,
+        "explain": "没有消费环节的日志等于没有日志。",
+        "q_en": "Does having logs equal having detection?",
+        "options_en": [
+          "Yes",
+          "No; you must define anomaly patterns, responders, and actions",
+          "Depends on tooling",
+          "Depends on volume"
+        ],
+        "explain_en": "Logs without a consumption step do not exist."
+      }
+    ],
+    "summary_en": "Logging must first answer what to keep and for how long. Keep authentication, authorization changes, and privileged operations; drop routine chatter. Without retention the alert pipeline starves."
+  },
+  {
+    "id": "ops-baseline",
+    "kind": "lab",
+    "category": "安全运营",
+    "cwe": "CWE-1188",
+    "title": "安全基线：把默认值改对",
+    "title_en": "Security Baselines",
+    "level": "beginner",
+    "icon": "BASE",
+    "color": "harden",
+    "summary": "大量入侵利用的不是漏洞，而是「默认配置没改」。基线是投入产出比最高的安全措施。",
+    "sections": [
+      {
+        "h": "基线是什么",
+        "p": "一组明确、可检查、可自动化的配置要求。例如：禁用默认账号、强制最短口令长度、关闭不必要的服务与端口、开启审计日志、限制管理接口来源。它不追求完美，追求「不出低级问题」。",
+        "h_en": "What a baseline is",
+        "p_en": "A set of explicit, checkable, automatable configuration requirements. Examples: disable default accounts, enforce minimum password length, close unnecessary services and ports, enable audit logging, restrict management interface sources. It does not seek perfection; it seeks the absence of low-level mistakes."
+      },
+      {
+        "h": "怎么定基线",
+        "p": "从公开标准出发（CIS Benchmarks、厂商安全指南、等保要求），结合自身业务裁剪。不要照搬——照搬会导致大量无法执行的条目，最终整份基线被搁置。",
+        "h_en": "How to define it",
+        "p_en": "Start from public standards (CIS Benchmarks, vendor security guides, regulatory requirements) and tailor to your business. Do not copy wholesale; copied baselines produce many unexecutable items and the whole document gets shelved."
+      },
+      {
+        "h": "怎么落地",
+        "p": "优先用镜像与配置管理固化（新机器天生合规），而不是靠人工检查。存量机器分批整改，先处理暴露面大的。每一条基线都要有明确的检查命令与判定标准。",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "基线检查示例：SSH 配置",
+            "bad": "# Relies on manual per-host checks, which never happen",
+            "good": "grep -E '^\\s*(PermitRootLogin|PasswordAuthentication|PermitEmptyPasswords)' /etc/ssh/sshd_config\n# Expected: PermitRootLogin no / PasswordAuthentication no (or controlled)",
+            "note": "检查要能脚本化，否则不会被执行",
+            "title_en": "Baseline check example: SSH config",
+            "note_en": "A check must be scriptable or it will not get run"
+          }
+        ],
+        "h_en": "How to implement",
+        "p_en": "Prefer immutability through images and configuration management (new machines start compliant) over manual checks. Remediate existing machines in batches, starting with the largest exposure. Every item needs a concrete check command and pass criteria."
+      },
+      {
+        "h": "怎么防回退",
+        "p": "配置漂移是常态。需要定期扫描并与基线比对，发现偏离即告警或自动修复。没有漂移检测的基线，半年后就会失效。",
+        "h_en": "Preventing drift",
+        "p_en": "Drift is normal. Periodically scan against the baseline and alert or auto-repair on deviation. Without drift detection, a baseline becomes irrelevant within six months."
+      },
+      {
+        "h": "与业务的关系",
+        "p": "基线过严会阻碍业务上线，最终被绕过。正确做法是分类分级：核心系统严格执行，试验环境适度放宽，但所有放宽都要记录理由。",
+        "h_en": "Relationship to business",
+        "p_en": "A baseline that is too strict blocks releases and gets bypassed. Classify and tier: core systems strictly, experimental environments moderately, and record the rationale for every relaxation."
+      }
+    ],
+    "refs": [
+      {
+        "name": "CIS Benchmarks",
+        "url": "https://www.cisecurity.org/cis-benchmarks"
+      },
+      {
+        "name": "MITRE CWE-1188",
+        "url": "https://cwe.mitre.org/data/definitions/1188.html"
+      }
+    ],
+    "tags": [
+      "安全运营",
+      "基线",
+      "加固"
+    ],
+    "quiz": [
+      {
+        "q": "安全基线的价值在于？",
+        "options": [
+          "可以替代渗透测试",
+          "消除大量「默认配置没改」的低级问题",
+          "满足审计要求",
+          "提升系统性能"
+        ],
+        "answer": 1,
+        "explain": "这是投入产出比最高的安全措施之一。",
+        "q_en": "Value of a security baseline?",
+        "options_en": [
+          "Replaces penetration testing",
+          "Eliminates many default-configuration mistakes",
+          "Satisfies audits",
+          "Improves performance"
+        ],
+        "explain_en": "One of the highest return-on-effort controls."
+      },
+      {
+        "q": "直接照搬公开标准的问题？",
+        "options": [
+          "标准不够权威",
+          "产生大量无法执行的条目，最终整份基线被搁置",
+          "实施成本太高",
+          "更新频率太慢"
+        ],
+        "answer": 1,
+        "explain": "必须结合自身业务裁剪，否则执行不下去。",
+        "q_en": "Problem with copying public standards wholesale?",
+        "options_en": [
+          "Not authoritative",
+          "Produces many unexecutable items so the whole baseline gets shelved",
+          "Too expensive",
+          "Updates too slowly"
+        ],
+        "explain_en": "Tailor to your business."
+      },
+      {
+        "q": "基线为什么会随时间失效？",
+        "options": [
+          "标准本身过时",
+          "配置漂移，缺少持续的漂移检测",
+          "人员流动",
+          "工具版本升级"
+        ],
+        "answer": 1,
+        "explain": "没有定期比对与纠偏，基线的执行力度就会逐步回落。",
+        "q_en": "Why do baselines decay over time?",
+        "options_en": [
+          "Standards are outdated",
+          "Configuration drift without drift detection",
+          "Staff turnover",
+          "Tool upgrades"
+        ],
+        "explain_en": "Without continuous comparison, it reverts."
+      }
+    ],
+    "summary_en": "A baseline is a written record of what your systems are supposed to look like. Without it you cannot tell a compromised host from a misconfigured one, because anything could be normal."
+  }
+]

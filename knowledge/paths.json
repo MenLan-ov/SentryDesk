@@ -1,0 +1,239 @@
+[
+  {
+    "id": "p-starter",
+    "title": "入门线：先建立正确的心智模型",
+    "title_en": "Starter: build the right mental model",
+    "desc": "适合零基础。先用六张卡搞清楚漏洞怎么分类、评分怎么读、处置按什么流程，再去学具体缺陷类型。",
+    "desc_en": "For beginners. Six cards to understand classification, scoring, and triage before diving into specific weaknesses.",
+    "minutes": 45,
+    "steps": [
+      "l-auth",
+      "l-injection",
+      "l-cvss",
+      "l-cwe",
+      "l-triage",
+      "l-defense"
+    ]
+  },
+  {
+    "id": "p-web",
+    "title": "Web 工程线：把注入与访问控制吃透",
+    "title_en": "Web track: injections and access control",
+    "desc": "面向 Web 开发者。五类最常见的 Web 缺陷，每类都配易受攻击代码与修复代码，学完可直接用于代码评审。",
+    "desc_en": "For web developers. Five common web weaknesses with vulnerable and fixed code you can reuse in code review.",
+    "minutes": 120,
+    "steps": [
+      "cwe-89",
+      "cwe-79",
+      "cwe-352",
+      "cwe-862",
+      "cwe-918",
+      "lab-code-01",
+      "lab-code-02",
+      "lab-check-01"
+    ]
+  },
+  {
+    "id": "p-memory",
+    "title": "内存安全线：C/C++ 与底层",
+    "title_en": "Memory safety: C/C++ and low level",
+    "desc": "越界读写、释放后使用、类型混淆、整数溢出。这一组缺陷是内核与终端软件的主要风险来源。",
+    "desc_en": "Out-of-bounds, use-after-free, type confusion, integer overflow—the core risks in kernels and native software.",
+    "minutes": 100,
+    "steps": [
+      "cwe-787",
+      "cwe-125",
+      "cwe-416",
+      "cwe-843",
+      "cwe-190",
+      "cwe-476"
+    ]
+  },
+  {
+    "id": "p-eng",
+    "title": "工程线：凭据、配置与流程",
+    "title_en": "Engineering: secrets, config, and process",
+    "desc": "面向团队与运维。三个最容易被忽视的高频问题，加上一次从漏洞到架构改进的完整推演。",
+    "desc_en": "For teams and ops. Three frequently overlooked issues plus a full walkthrough from advisory to architectural fix.",
+    "minutes": 75,
+    "steps": [
+      "cwe-798",
+      "l-secrets",
+      "lab-harden-01",
+      "lab-harden-02",
+      "cwe-269",
+      "l-incident",
+      "lab-mind-01"
+    ]
+  },
+  {
+    "id": "p-ir",
+    "title": "应急响应线：出事那天怎么扛",
+    "title_en": "Incident response: the day it happens",
+    "desc": "从拿到第一条告警到写复盘报告。八张卡覆盖流程、第一小时、取证、遏制取舍、后门清除、Web 入侵、通报沟通与勒索处置。",
+    "desc_en": "From the first alert to the post-mortem. Eight cards on lifecycle, the first hour, evidence, containment, persistence, web compromise, communication, and ransomware.",
+    "minutes": 150,
+    "steps": [
+      "ir-lifecycle",
+      "ir-triage-first-hour",
+      "ir-evidence",
+      "ir-contain",
+      "ir-persistence",
+      "ir-playbook-web",
+      "ir-comms",
+      "ir-ransomware"
+    ]
+  },
+  {
+    "id": "p-ti",
+    "title": "情报研判线：从告警到结论",
+    "title_en": "Threat intel: from signal to verdict",
+    "desc": "面向安全分析岗。四张卡建立研判框架：杀伤链定位、IOC 与 TTP 的取舍、告警降噪、威胁建模。",
+    "desc_en": "For analysts. Four cards on kill chain, IOC vs TTP, alert triage, and threat modeling.",
+    "minutes": 90,
+    "steps": [
+      "ti-cyber-kill-chain",
+      "ti-ioc-ttp",
+      "ti-false-positive",
+      "ti-threat-model"
+    ]
+  },
+  {
+    "id": "p-ops",
+    "title": "日常运营线：让防线持续有效",
+    "title_en": "Security operations: keeping defenses effective",
+    "desc": "面向运维与负责人。补丁闭环、日志与检测、安全基线三件事，决定了「出事时能不能发现」。",
+    "desc_en": "For ops and owners. Patch closure, logging, and baselines decide whether you notice.",
+    "minutes": 90,
+    "steps": [
+      "ops-baseline",
+      "ops-patch",
+      "ops-log",
+      "lab-mind-01"
+    ]
+  },
+  {
+    "id": "p-supply",
+    "title": "供应链线：从 SBOM 到构建可信",
+    "title_en": "Supply chain: from SBOM to trustworthy builds",
+    "desc": "适合要回答「我用了什么、有没有被投毒、产物能不能信」的人。走完这条线能独立做一次依赖审计，并说清 SLSA 等级到底卡在哪一步。",
+    "desc_en": "For anyone who must answer what we depend on, whether it was poisoned, and whether the artifact is trustworthy. Finish it and you can run a dependency audit and explain exactly which SLSA step blocks you.",
+    "minutes": 110,
+    "steps": [
+      "sup-sbom",
+      "intel-vex",
+      "sup-transitive",
+      "sup-confusion",
+      "sup-ci-secret",
+      "sup-slsa",
+      "sup-artifact-sign"
+    ]
+  },
+  {
+    "id": "p-intel",
+    "title": "情报研判线：让告警量降到可处理",
+    "title_en": "Intelligence triage: getting alert volume under control",
+    "desc": "面向每天面对几百条漏洞告警的人。重点不是学更多漏洞类型，而是学会用事实优先、概率次之的方式排序，并把日报压到十条以内。",
+    "desc_en": "For anyone facing hundreds of vulnerability alerts a day. The goal is not more vulnerability types but a fact-first, probability-second ranking that compresses daily output to under ten items.",
+    "minutes": 130,
+    "steps": [
+      "intel-cve-lifecycle",
+      "intel-kev",
+      "cloud-epss-context",
+      "intel-cvss4",
+      "intel-osv-ghsa",
+      "intel-triage-scale",
+      "intel-source-quality",
+      "intel-attck-map"
+    ]
+  },
+  {
+    "id": "p-api",
+    "title": "API 安全线：对象、属性与业务流",
+    "title_en": "API security: objects, properties, and business flows",
+    "desc": "API 的场景与 Web 不同，越权是主要风险而不是注入。这条线覆盖对象级、属性级、资源消耗与业务流滥用四类，并给出可复现的验证方法。",
+    "desc_en": "API risk differs from web risk: authorization dominates over injection. This path covers object-level, property-level, resource consumption and business-flow abuse, with reproducible verification steps.",
+    "minutes": 105,
+    "steps": [
+      "api-bola",
+      "api-mass-assign",
+      "api-gateway-pattern",
+      "api-resource-consumption",
+      "api-inventory",
+      "api-business-flow"
+    ]
+  },
+  {
+    "id": "p-attck",
+    "title": "红蓝对抗线：用 ATT&CK 串起攻防视角",
+    "title_en": "Adversary view: ATT&CK-driven offense & defense",
+    "desc": "适合有基础后想建立「攻击者怎么打、防守方怎么拦」全局视角的人。先用杀伤链与 ATT&CK 建框架，再回到具体弱点逐个击破，最后用威胁建模收口。",
+    "desc_en": "For those with basics who want the full offense/defense picture. Start with the kill chain and ATT&CK, drill into concrete weaknesses, then close with threat modeling.",
+    "minutes": 150,
+    "steps": [
+      "ti-cyber-kill-chain",
+      "intel-attck-map",
+      "cwe-78",
+      "cwe-287",
+      "cwe-502",
+      "cwe-798",
+      "ti-threat-model",
+      "lab-mind-01"
+    ]
+  },
+  {
+    "id": "p-supplychain-pro",
+    "title": "供应链工程师线：从依赖到构建产物全链路可信",
+    "title_en": "Supply-chain engineer: trust from dependency to artifact",
+    "desc": "面向平台与 DevOps 工程师。覆盖依赖混淆、传递依赖、CI 凭据、SBOM、SLSA 与产物签名——把「我构建出来的东西为什么可信」讲完整。",
+    "desc_en": "For platform and DevOps engineers. Covers dependency confusion, transitive deps, CI secrets, SBOM, SLSA and artifact signing — the complete story of why your build output is trustworthy.",
+    "minutes": 120,
+    "steps": [
+      "sup-confusion",
+      "sup-transitive",
+      "sup-ci-secret",
+      "sup-sbom",
+      "sup-slsa",
+      "sup-artifact-sign",
+      "cwe-94",
+      "lab-harden-01"
+    ]
+  },
+  {
+    "id": "p-cloudnative",
+    "title": "云原生安全线：IAM、容器与元数据服务",
+    "title_en": "Cloud-native security: IAM, containers and metadata",
+    "desc": "面向云上工作的工程师。云环境的攻防围绕身份与元数据展开：先学 SSRF 打元数据服务的经典路径，再学 IAM 最小权限与密钥管理，最后落到容器与工作负载加固。",
+    "desc_en": "For engineers working in the cloud. Cloud offense and defense revolve around identity and metadata: the classic SSRF-to-metadata path, IAM least privilege and key management, then container and workload hardening.",
+    "minutes": 100,
+    "steps": [
+      "cwe-918",
+      "cloud-ssrf-meta",
+      "cloud-iam-least",
+      "cloud-keymgmt",
+      "cloud-container",
+      "cwe-862",
+      "lab-check-01"
+    ]
+  },
+  {
+    "id": "p-appsec",
+    "title": "应用安全工程师线：代码评审视角的 Top 弱点",
+    "title_en": "AppSec engineer: top weaknesses from a code-review lens",
+    "desc": "面向做代码评审与安全测试的工程师。把 Top 25 里最高发的八类弱点按「原理 → 最小复现 → 修复范式」打通，配两张代码评审实验卡实战演练。",
+    "desc_en": "For engineers doing code review and security testing. The eight most common Top-25 weaknesses drilled as principle → minimal repro → fix pattern, with two code-review labs for practice.",
+    "minutes": 160,
+    "steps": [
+      "cwe-89",
+      "cwe-79",
+      "cwe-22",
+      "cwe-352",
+      "cwe-434",
+      "cwe-119",
+      "cwe-787",
+      "cwe-772",
+      "lab-code-01",
+      "lab-code-02"
+    ]
+  }
+]

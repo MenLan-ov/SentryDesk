@@ -1,0 +1,4031 @@
+[
+  {
+    "id": "cwe-89",
+    "kind": "cwe",
+    "category": "注入类",
+    "cwe": "CWE-89",
+    "title": "SQL 注入",
+    "title_en": "SQL Injection",
+    "level": "beginner",
+    "icon": "SQL",
+    "color": "injection",
+    "summary": "用户输入未加约束地拼进 SQL 语句，使攻击者能改写查询逻辑，读到、改掉甚至删掉整张表的数据。",
+    "summary_en": "Untrusted input concatenated into SQL lets an attacker rewrite the query.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "数据库引擎无法区分「这段是开发者写的 SQL」和「这段是用户填的参数」。当程序把用户输入直接拼进语句字符串，输入的文本就获得了 SQL 语法权力。经典形态：查询条件写成 'WHERE name = ' + input，攻击者填入 ' OR '1'='1 后，条件恒真，整表返回。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The database engine cannot tell which part of a query was written by the developer and which came from a user parameter. Once input is concatenated into the statement string, the text gains SQL syntax privileges. The classic form is WHERE name = ' + input. An attacker enters ' OR '1'='1 and the condition becomes always true, returning the whole table."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "三个常见原因：一是用字符串拼接构造查询，而不是参数绑定；二是动态拼接表名、列名、排序字段，而这些位置参数绑定无效；三是把 ORM 当护身符，却在内里写了原生 SQL 拼接片段。还有一类隐蔽问题：二次注入——脏数据先存库，后续查询时从库里读出来再拼接。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Three common causes: building queries by string concatenation instead of bound parameters; dynamically composing table or column names and sort direction, where parameter binding has no effect; treating an ORM as a talisman while writing raw concatenated fragments inside. A subtler variant is second-order injection, where dirty data is stored first and concatenated later when read back."
+      },
+      {
+        "h": "如何发现",
+        "p": "在输入点填入单引号 ' 观察是否报 SQL 语法错误；填入 ' AND 1=2 与 ' AND 1=1 对比返回差异；用时间盲注 ' AND SLEEP(5)-- 看响应是否延迟；观察错误页是否回显数据库版本、表名等内部信息。代码审计时搜索字符串拼接进入 execute 的位置。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Submit a single quote at the input and watch for SQL syntax errors; compare ' AND 1=2 against ' AND 1=1 and observe the difference; use time-based blind probing such as ' AND SLEEP(5)-- and check for delay; check whether error pages leak DB version or table names. In code review, search where concatenated strings reach execute()."
+      },
+      {
+        "h": "解决办法",
+        "p": "首选参数化查询（预编译语句），让数据和语句结构从一开始就分离。表名、字段名、排序方向这类无法参数化的位置，改用白名单映射——只接受预定义常量，拒绝用户原始字符串。数据库账号按最小权限授予，禁用堆叠查询。上线前对所有输入点做统一过滤，并把 SQL 报错信息全量转内部日志，不返回给前端。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "Statement",
+            "bad": "String sql = \"SELECT * FROM users WHERE name = '\" + name + \"'\";\nStatement st = conn.createStatement();\nResultSet rs = st.executeQuery(sql);",
+            "good": "String sql = \"SELECT * FROM users WHERE name = ?\";\nPreparedStatement ps = conn.prepareStatement(sql);\nps.setString(1, name);\nResultSet rs = ps.executeQuery();",
+            "note": "用户输入只能进入参数位，不能进入 SQL 语法位",
+            "title_en": "Statement",
+            "note_en": "User input may only reach the parameter slot, never the SQL syntax"
+          },
+          {
+            "lang": "python",
+            "title": "sqlite3",
+            "bad": "cur.execute(\"SELECT * FROM users WHERE name = '\" + name + \"'\")",
+            "good": "cur.execute(\"SELECT * FROM users WHERE name = ?\", (name,))",
+            "note": "参数作为元组传入，驱动负责转义",
+            "title_en": "sqlite3",
+            "note_en": "Passed as a tuple; the driver handles escaping"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Prefer parameterized queries so data and statement structure are separated from the start. For identifiers that cannot be parameterized (table names, column names, sort direction), use whitelist mapping that accepts only predefined constants. Grant the database account least privilege and disable stacked queries. Normalize input filtering at every entry point and route SQL errors to internal logs, never to the frontend."
+      },
+      {
+        "h": "验证",
+        "p": "修复后重放上述探测载荷，应全部被当作字面量处理；确认应用账号权限不含 DROP、FILE 等能力；日志中能检索到被拦截的注入尝试。",
+        "code": [],
+        "h_en": "Verify",
+        "p_en": "Replay the probes after the fix; every payload should be treated as a literal. Confirm the application account lacks DROP and FILE privileges, and that blocked attempts are searchable in the logs."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-89",
+        "url": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      {
+        "name": "OWASP SQL Injection",
+        "url": "https://owasp.org/www-community/attacks/SQL_Injection"
+      }
+    ],
+    "tags": [
+      "注入",
+      "数据库",
+      "Web"
+    ],
+    "quiz": [
+      {
+        "q": "下面哪种写法能真正消除 SQL 注入？",
+        "options": [
+          "对输入做 addslashes 转义",
+          "用黑白名单过滤关键字",
+          "使用参数化查询绑定变量",
+          "限制输入长度为 20 字符"
+        ],
+        "answer": 2,
+        "explain": "转义与过滤都可能被绕过；参数化让数据与语句结构在驱动层分离，是根本解法。",
+        "q_en": "Which approach actually eliminates SQL injection?",
+        "options_en": [
+          "Escaping input with addslashes",
+          "Blacklisting dangerous keywords",
+          "Binding variables via parameterized queries",
+          "Limiting input to 20 chars"
+        ],
+        "explain_en": "Escaping and filtering can be bypassed; parameterization separates data from statement structure at the driver level."
+      },
+      {
+        "q": "用户输入要参与 ORDER BY 的字段名，正确做法是？",
+        "options": [
+          "直接拼接字段名",
+          "用白名单把输入映射到固定字段列表",
+          "对字段名做 URL 编码",
+          "给字段名加引号"
+        ],
+        "answer": 1,
+        "explain": "字段名无法参数化，必须用白名单映射；加引号或编码都挡不住注入。",
+        "q_en": "User input must appear in an ORDER BY column name. What is correct?",
+        "options_en": [
+          "Concatenate the column name",
+          "Map input to a fixed column list via whitelist",
+          "URL-encode the column name",
+          "Wrap it in quotes"
+        ],
+        "explain_en": "Column names cannot be parameterized, so a whitelist mapping is required; quotes and encoding do not help."
+      },
+      {
+        "q": "发现 SQL 报错信息直接回显到页面上，风险是什么？",
+        "options": [
+          "没有任何风险",
+          "只是不美观",
+          "泄露表结构与数据库版本，便于构造盲注",
+          "会让页面变慢"
+        ],
+        "answer": 2,
+        "explain": "报错信息是攻击者的地图，应写入内部日志并对外只返回追踪号。",
+        "q_en": "What is the risk of echoing raw SQL errors to the page?",
+        "options_en": [
+          "No risk at all",
+          "Only cosmetic",
+          "Leaks schema and DB version, easing blind injection",
+          "Makes the page slow"
+        ],
+        "explain_en": "Error text is a map for attackers; log it internally and return only a trace id."
+      }
+    ]
+  },
+  {
+    "id": "cwe-79",
+    "kind": "cwe",
+    "category": "注入类",
+    "cwe": "CWE-79",
+    "title": "跨站脚本 XSS",
+    "title_en": "Cross-site Scripting",
+    "level": "beginner",
+    "icon": "XSS",
+    "color": "injection",
+    "summary": "页面把用户可控内容当代码执行，攻击者的脚本在受害者浏览器里以站点身份运行，可窃取会话。",
+    "summary_en": "User-controlled content executed as script in the victim's browser.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "浏览器看到 <script> 就会执行，看到 onclick 就会绑定事件。当页面把用户输入原样写进 HTML 而不做转义，输入就变成了程序。分为三类：反射型（载荷经 URL 回显）、存储型（载荷落库后每个访客都中招）、DOM 型（前端 JS 读取 location.hash 等直接写入 innerHTML，全程不过服务器）。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "A browser executes anything that looks like <script> and binds events for onclick. When the page writes user input into HTML without escaping, the input becomes code. There are three classes: reflected (payload echoed through a URL), stored (payload persists and hits every visitor), and DOM-based (frontend JS reads location.hash and writes straight into innerHTML, never touching the server)."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "开发者把 innerHTML、document.write、v-html 之类的接口当成普通赋值用；服务端只对表单字段转义，遗漏了 URL 参数、请求头、JSON 回显；富文本场景为了保留格式而放开了黑名单过滤，而黑名单永远是漏的。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Developers treat innerHTML, document.write, and v-html as ordinary assignment; server-side escaping covers form fields but misses URL parameters, request headers, and JSON echoes; rich-text features relax a blacklist filter to preserve formatting, and blacklists always leak."
+      },
+      {
+        "h": "如何发现",
+        "p": "在可控输入填 <script>alert(1)</script>、<img src=x onerror=alert(1)>、javascript:alert(1)、\" onmouseover=alert(1) x=\" 等载荷，观察是否弹窗或 DOM 中出现未转义的标签。存储型需提交后重新加载页面。DOM 型需在浏览器开发者工具里单步查看 sink 函数。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Inject <script>alert(1)</script>, <img src=x onerror=alert(1)>, javascript:alert(1), and \" onmouseover=alert(1) x=\" into controllable inputs and look for execution or unescaped tags in the DOM. Reload the page for stored variants. For DOM-based, step through sink functions in browser devtools."
+      },
+      {
+        "h": "解决办法",
+        "p": "输出编码是主线：按上下文（HTML 正文、属性、URL、JS 字符串）分别编码，不要一套转义打天下。富文本必须走白名单解析器，只保留允许的标签和属性。设置 Content-Security-Policy 作为纵深防御，限制脚本来源。Cookie 加 HttpOnly，降低会话被脚本读取的风险。前端框架默认转义，仅在确有必要时使用 v-html 并配合净化库。",
+        "code": [
+          {
+            "lang": "javascript",
+            "title": "innerHTML",
+            "bad": "element.innerHTML = userInput;",
+            "good": "element.textContent = userInput;",
+            "note": "非富文本场景一律用 textContent，浏览器不会解析标签",
+            "title_en": "innerHTML",
+            "note_en": "Use textContent for non-rich text; browsers never parse tags there"
+          },
+          {
+            "lang": "javascript",
+            "title": "富文本需净化",
+            "bad": "element.innerHTML = userInput;  // when rich text is required",
+            "good": "element.innerHTML = DOMPurify.sanitize(userInput, {ALLOWED_TAGS: [\"b\",\"i\",\"p\"]});",
+            "note": "白名单净化，只保留允许的标签",
+            "title_en": "Rich text must be sanitized",
+            "note_en": "Allowlist sanitization keeps only permitted tags"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Output encoding is the main line: encode per context (HTML body, attribute, URL, JS string) rather than one escape for everything. Rich text must pass a whitelist parser retaining only permitted tags and attributes. Set Content-Security-Policy as defense in depth to restrict script sources. Mark cookies HttpOnly to reduce session theft. Frontend frameworks escape by default; use v-html only when necessary and pair it with a sanitizer."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-79",
+        "url": "https://cwe.mitre.org/data/definitions/79.html"
+      },
+      {
+        "name": "OWASP XSS",
+        "url": "https://owasp.org/www-community/attacks/xss/"
+      }
+    ],
+    "tags": [
+      "注入",
+      "Web",
+      "前端"
+    ],
+    "quiz": [
+      {
+        "q": "页面需要把用户输入的昵称显示在 HTML 正文里，最安全的做法是？",
+        "options": [
+          "用 innerHTML 赋值",
+          "用 textContent 赋值",
+          "先替换掉 script 关键字再 innerHTML",
+          "对输入做 base64 编码后显示"
+        ],
+        "answer": 1,
+        "explain": "textContent 不解析标签，浏览器只把它当纯文本，从根上切断执行。",
+        "q_en": "A nickname must be shown in HTML body text. Safest approach?",
+        "options_en": [
+          "Assign with innerHTML",
+          "Assign with textContent",
+          "Strip the word script then use innerHTML",
+          "Base64-encode before display"
+        ],
+        "explain_en": "textContent never parses markup, so the browser treats input as plain text."
+      },
+      {
+        "q": "存储型 XSS 与反射型 XSS 的关键区别是？",
+        "options": [
+          "存储型不需要用户点击",
+          "存储型会落库，所有访客都会中招",
+          "存储型只能用 img 标签",
+          "反射型危害更大"
+        ],
+        "answer": 1,
+        "explain": "存储型载荷长期留在服务端，影响面是全部访问者，危害通常更大。",
+        "q_en": "Key difference between stored and reflected XSS?",
+        "options_en": [
+          "Stored needs no click",
+          "Stored persists in storage, hitting every visitor",
+          "Stored only works with img tags",
+          "Reflected is always worse"
+        ],
+        "explain_en": "Stored payloads persist server-side and affect all visitors."
+      },
+      {
+        "q": "已经做了输出转义，再加 CSP 的作用是？",
+        "options": [
+          "纯属多余",
+          "作为纵深防御，万一某处转义遗漏仍有兜底",
+          "替代转义",
+          "提升页面加载速度"
+        ],
+        "answer": 1,
+        "explain": "任何单一控制都可能失效，CSP 限制脚本来源，是第二道防线。",
+        "q_en": "Output escaping is already in place. Why add CSP?",
+        "options_en": [
+          "It is redundant",
+          "Defense in depth if an escape point is missed",
+          "It replaces escaping",
+          "It speeds up page load"
+        ],
+        "explain_en": "Any single control can fail; CSP restricts script sources as a second layer."
+      }
+    ]
+  },
+  {
+    "id": "cwe-78",
+    "kind": "cwe",
+    "category": "注入类",
+    "cwe": "CWE-78",
+    "title": "操作系统命令注入",
+    "title_en": "OS Command Injection",
+    "level": "intermediate",
+    "icon": "CMD",
+    "color": "injection",
+    "summary": "程序把外部输入拼进 shell 命令，攻击者用分号、管道、反引号追加指令，直接拿到服务器执行权限。",
+    "summary_en": "External input concatenated into a shell command allows arbitrary command execution.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "shell 把 ; | && || $() `` \\n 都当作命令分隔符。如果程序调用 system('ping ' + host)，攻击者传入 127.0.0.1; cat /etc/passwd，shell 会先 ping 再执行 cat。嵌入在参数里的载荷同样有效，因为 shell 会先做分词再执行。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "A shell treats ; | && || $() and backticks as command separators. Given system('ping ' + host), an attacker passing 127.0.0.1; cat /etc/passwd runs ping then cat. Payloads embedded inside an argument also work, because the shell tokenizes first and executes after."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为图省事用 shell 执行外部程序；把用户提供的文件名、域名、URL 直接传进命令行；认为「已经用引号包起来了」就安全，但没处理输入本身含引号的情况；在容器里以 root 运行，注入后直接是最高权限。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Using a shell for convenience; passing user-supplied filenames, hostnames, or URLs straight into a command line; assuming quoting is enough without handling input that contains quotes itself; running as root inside a container, so injection yields top privilege."
+      },
+      {
+        "h": "如何发现",
+        "p": "在疑似命令参数处填 ; id、| whoami、&& sleep 10、$(id)、`id`、%0a id。观察响应里是否出现命令输出，或是否出现可感知的延迟。带盲注特性时用 DNSLog 或 HTTP 回连确认。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "In suspected arguments submit ; id, | whoami, && sleep 10, $(id), and %0a id. Watch for command output in the response or a perceptible delay. For blind cases, confirm with a DNS or HTTP callback."
+      },
+      {
+        "h": "解决办法",
+        "p": "不要走 shell：用 execve 这类直接传参数数组的接口，参数不经过 shell 解析，分隔符失去意义。若必须调用外部程序，对参数做严格白名单校验（如只允许字母数字和点）。以非特权账号运行服务，容器内禁止提权。禁用不必要的网络工具，限制出站连接。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "Runtime.exec 拼接",
+            "bad": "Runtime.getRuntime().exec(\"ping -c 4 \" + host);",
+            "good": "new ProcessBuilder(\"ping\", \"-c\", \"4\", host).start();",
+            "note": "参数数组不经过 shell 解析，分号与管道失去意义",
+            "title_en": "Concatenated Runtime.exec",
+            "note_en": "An argument array bypasses shell parsing, so semicolons and pipes lose meaning"
+          },
+          {
+            "lang": "python",
+            "title": "shell=True",
+            "bad": "subprocess.run(f\"ping -c 4 {host}\", shell=True)",
+            "good": "subprocess.run([\"ping\", \"-c\", \"4\", host], shell=False)",
+            "note": "关闭 shell 后，输入只能是 ping 的参数",
+            "title_en": "shell=True",
+            "note_en": "With the shell disabled the input can only be a ping argument"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Do not route through a shell: use an exec API that takes an argument array, so parameters never pass through shell parsing and separators lose meaning. If an external program is unavoidable, whitelist-validate parameters (letters, digits, dot). Run services as an unprivileged account and block in-container privilege escalation. Disable unnecessary network tools and restrict outbound access."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-78",
+        "url": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      {
+        "name": "OWASP Command Injection",
+        "url": "https://owasp.org/www-community/attacks/Command_Injection"
+      }
+    ],
+    "tags": [
+      "注入",
+      "系统",
+      "RCE"
+    ],
+    "quiz": [
+      {
+        "q": "要调用外部程序并传入用户提供的域名，哪种方式最安全？",
+        "options": [
+          "字符串拼接后交给 system()",
+          "用 exec 传参数数组，不经过 shell",
+          "对输入做 HTML 转义",
+          "把输入转成小写"
+        ],
+        "answer": 1,
+        "explain": "参数数组不经过 shell 分词，; | && 等分隔符失去意义。",
+        "q_en": "You must call an external program with a user-supplied host. Safest?",
+        "options_en": [
+          "Concatenate into a string and call system()",
+          "Use an exec API with an argument array, no shell",
+          "HTML-escape the input",
+          "Lowercase the input"
+        ],
+        "explain_en": "Argument arrays bypass shell tokenization, so separators lose meaning."
+      },
+      {
+        "q": "安全地绕过命令注入后，仍建议限制出站连接，原因是？",
+        "options": [
+          "为了省流量",
+          "防止其他途径被利用时攻击者横向移动",
+          "提升响应速度",
+          "满足排版要求"
+        ],
+        "answer": 1,
+        "explain": "纵深防御：即使某处仍有缺陷，出站限制能减少可造成的损害。",
+        "q_en": "After fixing command injection, why still restrict outbound connections?",
+        "options_en": [
+          "To save bandwidth",
+          "To limit lateral movement if another path is exploited",
+          "To improve speed",
+          "For formatting"
+        ],
+        "explain_en": "Defense in depth: outbound limits bound the damage of unknown flaws."
+      },
+      {
+        "q": "在容器里以 root 运行服务，命令注入成功后的后果是？",
+        "options": [
+          "影响很小",
+          "容器内即为最高权限，可直接危及宿主机挂载卷",
+          "只能读取日志",
+          "会自动被隔离"
+        ],
+        "answer": 1,
+        "explain": "最小权限原则要求服务以非特权账号运行，泄露后影响范围受限。",
+        "q_en": "A service runs as root inside a container. Consequence of successful injection?",
+        "options_en": [
+          "Minimal impact",
+          "Full container privileges, risking mounted host volumes",
+          "Only log reads",
+          "Auto-isolation"
+        ],
+        "explain_en": "Least privilege requires a non-privileged account to bound impact."
+      }
+    ]
+  },
+  {
+    "id": "cwe-22",
+    "kind": "cwe",
+    "category": "访问控制",
+    "cwe": "CWE-22",
+    "title": "路径穿越",
+    "title_en": "Path Traversal",
+    "level": "beginner",
+    "icon": "PATH",
+    "color": "access",
+    "summary": "文件名参数里塞入 ../ 序列，跳出预期目录，读取或覆盖本不该访问的文件。",
+    "summary_en": "Manipulating a file path with ../ escapes the intended directory.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "程序用用户提供的文件名拼接路径，如 base + '/' + name。当 name 为 ../../../../etc/passwd 时，路径解析后跳出 base 目录。Windows 下 \\..\\ 与 ..%5c 同样有效，且存在 8.3 短文件名、UNC 路径等额外变形。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The program builds a path by concatenating a base directory with a user-supplied name. When name is ../../../../etc/passwd, resolution escapes the base. On Windows, \\..\\ and ..%5c work too, along with 8.3 short names and UNC paths."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "只做了简单的 ../ 字符串替换，攻击者用 ....// 或 URL 编码 %2e%2e%2f 绕过；没做规范化就判断前缀；把下载目录与上传目录混用；归档解压时未校验条目路径（Zip Slip）。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Simple replacement of the ../ substring, bypassed with ....// or URL-encoded %2e%2e%2f; judging a prefix before normalization; mixing download and upload directories; extracting archives without validating entry paths (Zip Slip)."
+      },
+      {
+        "h": "如何发现",
+        "p": "在文件读取、下载、模板加载、日志查看等入口填 ../../../../etc/passwd、..\\..\\windows\\win.ini、....//....//etc/passwd、%2e%2e%2f 编码变体。对比正常请求与穿越请求的响应差异。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "At file read, download, template loading, and log viewing endpoints submit ../../../../etc/passwd, ..\\..\\windows\\win.ini, ....//....//etc/passwd, and %2e%2e%2f variants. Compare responses against normal requests."
+      },
+      {
+        "h": "解决办法",
+        "p": "先规范化再校验：把拼接结果 realpath 化，然后确认结果仍以允许的基目录为前缀，比较时用规范化后的绝对路径。更彻底的做法是不接受用户提供路径本身，改为传递 ID 由服务端映射。文件名做白名单字符校验。解压归档时逐条校验条目路径。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "直接拼接",
+            "bad": "File f = new File(baseDir, filename);\nreturn read(f);",
+            "good": "File f = new File(baseDir, filename).getCanonicalFile();\nif (!f.toPath().startsWith(new File(baseDir).getCanonicalPath())) {\n    throw new SecurityException(\"out of scope\");\n}\nreturn read(f);",
+            "note": "先规范化再比较绝对路径前缀，而不是匹配 ../ 字符串",
+            "title_en": "Direct concatenation",
+            "note_en": "Normalize, then compare the absolute path prefix — never match \"..\" as a string"
+          },
+          {
+            "lang": "python",
+            "title": "Path.resolve",
+            "bad": "open(os.path.join(BASE, name))",
+            "good": "p = (Path(BASE) / name).resolve()\nif not p.is_relative_to(Path(BASE).resolve()):\n    raise ValueError\nreturn p.read_bytes()",
+            "note": "resolve 消除 .. 后再判断归属",
+            "title_en": "Path.resolve",
+            "note_en": "Let resolve collapse \"..\" before deciding ownership"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Normalize then verify: resolve the joined path to a canonical absolute path, then confirm it still starts with the allowed base directory. More thorough: do not accept a path at all, accept an ID the server maps. Whitelist filename characters. Validate each archive entry during extraction."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-22",
+        "url": "https://cwe.mitre.org/data/definitions/22.html"
+      }
+    ],
+    "tags": [
+      "文件",
+      "访问控制"
+    ],
+    "quiz": [
+      {
+        "q": "防御路径穿越时，为什么不能只替换字符串 ../？",
+        "options": [
+          "因为替换太慢",
+          "因为存在 ....// 与 URL 编码等等价变形",
+          "因为会破坏正常路径",
+          "因为 JavaScript 不支持"
+        ],
+        "answer": 1,
+        "explain": "变形方式很多，黑名单永远漏；必须先规范化再判断归属。",
+        "q_en": "Why is replacing the string ../ insufficient?",
+        "options_en": [
+          "It is slow",
+          "Equivalent forms like ....// and URL encoding exist",
+          "It breaks valid paths",
+          "JavaScript lacks support"
+        ],
+        "explain_en": "Many variants exist; normalize first, then verify containment."
+      },
+      {
+        "q": "校验路径归属的正确顺序是？",
+        "options": [
+          "先判断前缀再规范化",
+          "先规范化成绝对路径，再判断是否在基目录内",
+          "只判断文件是否存在",
+          "只判断扩展名"
+        ],
+        "answer": 1,
+        "explain": "没规范化时 ../ 尚未解析，前缀比较会失效。",
+        "q_en": "Correct order for validating path containment?",
+        "options_en": [
+          "Check prefix then normalize",
+          "Normalize to absolute path, then verify it stays under base",
+          "Only check existence",
+          "Only check extension"
+        ],
+        "explain_en": "Without normalization, ../ is unresolved and prefix checks fail."
+      },
+      {
+        "q": "应用不直接接收文件路径、而是接收 ID 由服务端映射，好处是？",
+        "options": [
+          "只是代码整洁",
+          "从接口层面根除路径注入可能",
+          "能提升下载速度",
+          "减少存储占用"
+        ],
+        "answer": 1,
+        "explain": "不给攻击者控制路径的机会，是最彻底的做法。",
+        "q_en": "Passing an ID that the server maps to a path, instead of a path, helps because?",
+        "options_en": [
+          "Cleaner code",
+          "It removes attacker control over paths entirely",
+          "Faster downloads",
+          "Less storage"
+        ],
+        "explain_en": "Not exposing a path parameter is the most thorough fix."
+      }
+    ]
+  },
+  {
+    "id": "cwe-502",
+    "kind": "cwe",
+    "category": "反序列化",
+    "cwe": "CWE-502",
+    "title": "不安全的反序列化",
+    "title_en": "Deserialization of Untrusted Data",
+    "level": "advanced",
+    "icon": "DESER",
+    "color": "deser",
+    "summary": "把外部数据还原成对象时触发了攻击者构造的类链，常见后果是远程代码执行，危害极高。",
+    "summary_en": "Deserializing untrusted data can trigger gadget chains and remote code execution.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "反序列化不是单纯的数据解析——它会在目标语言里创建对象、调用构造函数与魔术方法。攻击者可以预先构造一段字节流，指定要实例化的类及其属性，当这些对象被销毁或访问时触发 __destruct、readObject、__reduce__ 等钩子，串成一条从入口到危险函数的利用链（gadget chain）。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Deserialization is not mere data parsing: it creates objects and invokes constructors and magic methods in the target language. An attacker can pre-craft a byte stream naming the class to instantiate and its properties, then hook into __destruct, readObject, or __reduce__ to chain from entry to a dangerous function (a gadget chain)."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "把序列化格式当作传输协议，直接接收外部数据；依赖库版本陈旧，公开利用链唾手可得；即使不直接反序列化用户数据，也会反序列化 Cookie、缓存、消息队列内容；框架默认开启自动类型解析。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Treating serialization as a transport protocol and accepting external data directly; stale dependency versions with public exploit chains; deserializing cookies, cache, or queue contents indirectly; frameworks enabling automatic type resolution by default."
+      },
+      {
+        "h": "如何发现",
+        "p": "识别特征字节：Java 的 AC ED（base64 以 rO0AB 开头）、PHP 的 O:、Python pickle 的 80 开头、.NET 的 AAEAAAD、YAML 的 !!python。对疑似入口替换载荷观察报错栈是否暴露类名。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Recognize magic bytes: Java's AC ED (base64 rO0AB), PHP's O:, Python pickle starting with 80, .NET's AAEAAAD, YAML's !!python. Swap payloads at likely entry points and watch whether error stacks expose class names."
+      },
+      {
+        "h": "解决办法",
+        "p": "首选换格式：用 JSON 等纯数据格式，避免携带类型信息。必须用原生序列化时，启用类型白名单，只允许已知安全的类。签名校验数据来源，防止篡改。升级依赖库，移除已知含利用链的组件。把反序列化操作限制在低权限进程内执行。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "pickle.loads",
+            "bad": "obj = pickle.loads(request.data)",
+            "good": "obj = json.loads(request.data)",
+            "note": "JSON 只表达数据，不携带可执行对象",
+            "title_en": "pickle.loads",
+            "note_en": "JSON expresses data only and carries no executable objects"
+          },
+          {
+            "lang": "java",
+            "title": "ObjectInputStream",
+            "bad": "ObjectInputStream in = new ObjectInputStream(is);\nObject o = in.readObject();",
+            "good": "// Use JSON; if Java serialization is unavoidable, enable an allowlist\nObjectInputFilter filter = ObjectInputFilter.Config.createFilter(\n    \"com.myapp.dto.*;!*\");\nois.setObjectInputFilter(filter);",
+            "note": "只允许预期的 DTO 类，其余一律拒绝",
+            "title_en": "ObjectInputStream",
+            "note_en": "Allow only the expected DTO classes and reject everything else"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Prefer a different format: use JSON and other pure-data formats that do not carry type information. When native serialization is required, enable a type whitelist of known-safe classes. Sign data to prevent tampering. Upgrade dependencies and remove components with known gadgets. Confine deserialization to a low-privilege process."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-502",
+        "url": "https://cwe.mitre.org/data/definitions/502.html"
+      },
+      {
+        "name": "OWASP Deserialization",
+        "url": "https://owasp.org/www-community/vulnerabilities/Deserialization_of_untrusted_data"
+      }
+    ],
+    "tags": [
+      "反序列化",
+      "RCE"
+    ],
+    "quiz": [
+      {
+        "q": "为什么说 JSON 比原生序列化更安全？",
+        "options": [
+          "JSON 体积更小",
+          "JSON 只表达数据，不携带可执行对象与类型信息",
+          "JSON 有加密",
+          "JSON 支持更多类型"
+        ],
+        "answer": 1,
+        "explain": "原生序列化会创建对象并触发方法，JSON 不会，缺少这条利用链的入口。",
+        "q_en": "Why is JSON safer than native serialization?",
+        "options_en": [
+          "Smaller payload",
+          "JSON carries data only, not executable objects or type info",
+          "JSON is encrypted",
+          "JSON supports more types"
+        ],
+        "explain_en": "Native deserialization instantiates objects and calls methods, enabling gadget chains."
+      },
+      {
+        "q": "必须使用 Java 原生序列化时，关键防护是什么？",
+        "options": [
+          "开启压缩",
+          "设置对象类型白名单，只允许预期 DTO",
+          "改用 UDP 传输",
+          "增加传输超时"
+        ],
+        "answer": 1,
+        "explain": "白名单让攻击者无法指定任意类，利用链从第一步就被掐断。",
+        "q_en": "If native Java serialization is unavoidable, the key control is?",
+        "options_en": [
+          "Enable compression",
+          "Set an object type whitelist allowing only expected DTOs",
+          "Switch to UDP",
+          "Add timeouts"
+        ],
+        "explain_en": "A whitelist prevents attackers from selecting arbitrary classes."
+      },
+      {
+        "q": "Signature 特征字节 AC ED 出现在请求里，通常意味着？",
+        "options": [
+          "这是 JSON 数据",
+          "这是 Java 序列化数据，需要重点审查",
+          "这是图片文件",
+          "这是加密数据"
+        ],
+        "answer": 1,
+        "explain": "AC ED 是 Java 序列化流的魔数，base64 后常表现为 rO0AB。",
+        "q_en": "Signature bytes AC ED in a request usually mean?",
+        "options_en": [
+          "JSON data",
+          "Java serialized data requiring review",
+          "An image file",
+          "Encrypted data"
+        ],
+        "explain_en": "AC ED is the Java serialization magic; base64 form often starts with rO0AB."
+      }
+    ]
+  },
+  {
+    "id": "cwe-787",
+    "kind": "cwe",
+    "category": "内存安全",
+    "cwe": "CWE-787",
+    "title": "越界写入",
+    "title_en": "Out-of-bounds Write",
+    "level": "advanced",
+    "icon": "OOBW",
+    "color": "memory",
+    "summary": "程序往缓冲区边界之外写数据，覆盖相邻内存，是 C/C++ 程序里最常见的可利用漏洞之一。",
+    "summary_en": "Writing past the end of a buffer corrupts adjacent memory.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "栈上或堆上分配了固定大小的缓冲区，写入时没有对长度做上限检查。越界写入可以覆盖返回地址、函数指针、堆元数据等控制流敏感区域，攻击者借此劫持执行流，或仅造成崩溃（拒绝服务）。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "A fixed-size buffer is allocated on stack or heap and written without checking length. An out-of-bounds write can overwrite return addresses, function pointers, or heap metadata, letting an attacker hijack control flow or simply crash the process."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "使用 strcpy、sprintf、memcpy 等不检查长度的函数；长度计算出现整数溢出，导致分配过小；把用户提供的长度值直接当作拷贝长度；循环边界写成 <= 而非 <。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Using strcpy, sprintf, or memcpy without length checks; size math suffering integer overflow so allocation is too small; passing a user-supplied length directly as a copy size; loop bounds written as <= instead of <."
+      },
+      {
+        "h": "如何发现",
+        "p": "静态扫描定位危险 API 调用；编译时开启 AddressSanitizer、FORTIFY_SOURCE、栈保护；用 fuzzing 对解析类接口灌入畸形输入，观察是否崩溃；崩溃样本用调试器定位覆盖位置。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Static scan for dangerous API calls; compile with AddressSanitizer, FORTIFY_SOURCE, and stack protection; fuzz parsing interfaces with malformed input and watch for crashes; locate the overwrite with a debugger on a crashing sample."
+      },
+      {
+        "h": "解决办法",
+        "p": "改用有边界检查的接口（strncpy_s、snprintf、std::span、.at()）。长度计算先做上界校验，防整数溢出。开启编译器加固选项与运行时防护（ASLR、DEP、CFG）。在内存安全语言允许的场景下，把高危解析模块用 Rust 重写。",
+        "code": [
+          {
+            "lang": "c",
+            "title": "strcpy",
+            "bad": "char buf[64];\nstrcpy(buf, user_input);",
+            "good": "char buf[64];\nsnprintf(buf, sizeof(buf), \"%s\", user_input);",
+            "note": "显式传长度上限，超长自动截断",
+            "title_en": "strcpy",
+            "note_en": "Pass an explicit length limit and truncate automatically"
+          },
+          {
+            "lang": "rust",
+            "title": "未检查索引",
+            "bad": "let v = data[i];  // i may be out of range when it comes from outside",
+            "good": "let v = data.get(i).ok_or(Error::OutOfRange)?;",
+            "note": "安全语言同样要检查外部索引",
+            "title_en": "Unchecked index",
+            "note_en": "Even memory-safe languages must check external indices"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use bounds-checked APIs (strncpy_s, snprintf, std::span, .at()). Validate length arithmetic upper bounds to prevent integer overflow. Enable compiler hardening and runtime protections (ASLR, DEP, CFG). Where memory-safe languages fit, rewrite high-risk parsers in Rust."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-787",
+        "url": "https://cwe.mitre.org/data/definitions/787.html"
+      }
+    ],
+    "tags": [
+      "内存",
+      "C/C++"
+    ],
+    "quiz": [
+      {
+        "q": "strcpy 与 snprintf 的关键差别是？",
+        "options": [
+          "snprintf 更快",
+          "snprintf 显式接收长度上限，不会越界写",
+          "strcpy 会加密",
+          "两者完全等价"
+        ],
+        "answer": 1,
+        "explain": "长度上限是最直接的边界保护。",
+        "q_en": "Key difference between strcpy and snprintf?",
+        "options_en": [
+          "snprintf is faster",
+          "snprintf takes an explicit size limit, preventing overflow",
+          "strcpy encrypts",
+          "They are equivalent"
+        ],
+        "explain_en": "An explicit bound is the most direct protection."
+      },
+      {
+        "q": "计算分配大小前为什么要检查整数溢出？",
+        "options": [
+          "为了代码整洁",
+          "溢出后回绕成小值，导致分配过小而后续写入越界",
+          "因为编译器要求",
+          "为了避免警告"
+        ],
+        "answer": 1,
+        "explain": "溢出把大数变成小数，是越界写入的常见前置条件。",
+        "q_en": "Why check integer overflow before computing allocation size?",
+        "options_en": [
+          "For tidiness",
+          "Overflow wraps to a small value, allocating too little then writing out of bounds",
+          "Compilers require it",
+          "To avoid warnings"
+        ],
+        "explain_en": "Overflow turns a large number small, a common precondition for OOB writes."
+      },
+      {
+        "q": "下面哪项不是内存安全加固手段？",
+        "options": [
+          "ASLR 与 DEP",
+          "FORTIFY_SOURCE",
+          "把用户输入转成小写",
+          "AddressSanitizer"
+        ],
+        "answer": 2,
+        "explain": "大小写转换与内存安全无关，其余三项都是运行时或编译期防护。",
+        "q_en": "Which is NOT a memory safety hardening measure?",
+        "options_en": [
+          "ASLR and DEP",
+          "FORTIFY_SOURCE",
+          "Lowercasing user input",
+          "AddressSanitizer"
+        ],
+        "explain_en": "Case conversion is unrelated to memory safety."
+      }
+    ]
+  },
+  {
+    "id": "cwe-416",
+    "kind": "cwe",
+    "category": "内存安全",
+    "cwe": "CWE-416",
+    "title": "释放后使用",
+    "title_en": "Use After Free",
+    "level": "advanced",
+    "icon": "UAF",
+    "color": "memory",
+    "summary": "内存被释放后指针未置空，程序继续通过它读写，攻击者可抢占这块内存并注入受控数据。",
+    "summary_en": "Dereferencing memory after it has been freed.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "free 只把内存归还给分配器，并不会擦除内容，旧指针仍指向原地址。如果此时分配器把同一块内存分给另一处可控数据，原指针读到的就是攻击者写入的内容。若原位置存放的是虚表指针或函数指针，即可劫持控制流。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "free returns memory to the allocator but does not erase contents, so the old pointer still targets the address. If the allocator later hands that block to attacker-controlled data, the stale pointer reads the attacker's bytes. If the slot held a vtable or function pointer, control flow can be hijacked."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "对象销毁后仍被事件回调、异步任务、缓存引用；多个所有权主体重复释放（double free）；错误处理分支提前释放，正常分支继续使用；容器清空元素但外部仍持有引用。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Objects destroyed while still referenced by event callbacks, async tasks, or caches; multiple owners double-freeing; early frees in error paths while the normal path keeps using the pointer; containers clearing elements while callers still hold references."
+      },
+      {
+        "h": "如何发现",
+        "p": "开启 AddressSanitizer 的 use-after-free 检测；Valgrind 跑测试用例；fuzzing 结合 ASan；审查涉及生命周期管理的代码，特别是回调注册与注销路径。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Enable AddressSanitizer use-after-free detection; run Valgrind; fuzz with ASan enabled; audit lifetime-sensitive code, especially callback registration and teardown."
+      },
+      {
+        "h": "解决办法",
+        "p": "释放后立即把指针置空，并在使用前判空。用智能指针明确所有权（unique_ptr/shared_ptr），避免裸指针多点持有。异步场景用弱引用或引用计数。改用 Rust 等所有权模型严格的语言实现高危模块。",
+        "code": [
+          {
+            "lang": "c",
+            "title": "释放后继续使用",
+            "bad": "free(ptr);\nuse(ptr);",
+            "good": "free(ptr);\nptr = NULL;\nif (ptr) use(ptr);",
+            "note": "释放即置空，配合判空避免悬垂指针",
+            "title_en": "Use after free",
+            "note_en": "Null out on free and check for null to avoid dangling pointers"
+          },
+          {
+            "lang": "rust",
+            "title": "所有权转移",
+            "bad": "// A raw pointer held across scopes cannot be caught at compile time",
+            "good": "let owned = String::from(\"x\");\nlet r = &owned;  // cannot drop(owned) while borrowed",
+            "note": "编译器强制生命周期，从根上消除 UAF",
+            "title_en": "Ownership transfer",
+            "note_en": "The compiler enforces lifetimes, eliminating use-after-free at the root"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Null the pointer immediately after free and check before use. Make ownership explicit with smart pointers (unique_ptr/shared_ptr) instead of multi-owner raw pointers. Use weak references or reference counting in async code. Implement high-risk modules in Rust, whose ownership model rejects these patterns."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-416",
+        "url": "https://cwe.mitre.org/data/definitions/416.html"
+      }
+    ],
+    "tags": [
+      "内存",
+      "C/C++"
+    ],
+    "quiz": [
+      {
+        "q": "释放内存后立即把指针置空，能解决什么？",
+        "options": [
+          "防止内存泄漏",
+          "避免通过旧指针继续访问已释放内存",
+          "提升分配速度",
+          "减少碎片"
+        ],
+        "answer": 1,
+        "explain": "置空后配合判空，悬垂指针访问会被立即发现。",
+        "q_en": "What does nulling a pointer right after free solve?",
+        "options_en": [
+          "Memory leaks",
+          "Prevents accessing freed memory through the stale pointer",
+          "Allocation speed",
+          "Fragmentation"
+        ],
+        "explain_en": "Combined with null checks, dangling access becomes immediately visible."
+      },
+      {
+        "q": "Rust 为什么能从语言层面消除 UAF？",
+        "options": [
+          "因为它运行更慢",
+          "靠所有权与借用检查在编译期阻止悬垂引用",
+          "因为它不释放内存",
+          "因为有 GC"
+        ],
+        "answer": 1,
+        "explain": "编译期检查生命周期，非法访问根本无法通过编译。",
+        "q_en": "Why does Rust eliminate UAF at the language level?",
+        "options_en": [
+          "It runs slower",
+          "Ownership and borrow checking reject dangling references at compile time",
+          "It never frees",
+          "It has a GC"
+        ],
+        "explain_en": "Lifetimes are checked at compile time, so illegal access does not build."
+      },
+      {
+        "q": "异步任务持有对象引用，对象在任务完成前被销毁，这是典型的？",
+        "options": [
+          "内存泄漏",
+          "释放后使用",
+          "栈溢出",
+          "死锁"
+        ],
+        "answer": 1,
+        "explain": "回调与异步是最常见的 UAF 场景，应改用弱引用或引用计数。",
+        "q_en": "An async task holds a reference while the object is dropped. This is?",
+        "options_en": [
+          "Memory leak",
+          "Use after free",
+          "Stack overflow",
+          "Deadlock"
+        ],
+        "explain_en": "Callbacks and async are the most common UAF scenarios."
+      }
+    ]
+  },
+  {
+    "id": "cwe-20",
+    "kind": "cwe",
+    "category": "输入校验",
+    "cwe": "CWE-20",
+    "title": "输入验证不充分",
+    "title_en": "Improper Input Validation",
+    "level": "beginner",
+    "icon": "VAL",
+    "color": "input",
+    "summary": "程序信任了外部输入的形式与范围，把畸形数据带进后续逻辑，往往成为其他漏洞的起点。",
+    "summary_en": "Failing to validate the form and range of external input.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "输入验证是纵深防御的第一层。验证缺失本身通常不直接可利用，但它让攻击载荷顺利抵达下游的 SQL 拼接、命令执行、文件路径、内存拷贝等危险位置，放大成一个具体漏洞。因此 CWE-20 常被称作「父类缺陷」。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Input validation is the first layer of defense in depth. Missing validation is rarely exploitable on its own, but it lets payloads reach dangerous sinks (SQL concatenation, command execution, file paths, memory copies) and become concrete vulnerabilities. CWE-20 is therefore called a parent weakness."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "只在前端校验，后端完全信任请求；用黑名单过滤特殊字符，而攻击面远超黑名单；对类型、长度、范围、字符集缺乏约束；把校验分散在各处，没有统一入口。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Validating only in the frontend and trusting requests on the server; blacklisting special characters when the attack surface is far wider; missing constraints on type, length, range, and charset; scattering validation across code with no single entry point."
+      },
+      {
+        "h": "如何发现",
+        "p": "对每个接口发送超出预期类型与范围的数据：超长字符串、负数、极大整数、空值、数组代替标量、JSON 中混入对象；观察是否出现 500 错误、异常栈、数据截断或行为异常。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Send data outside expected type and range to every interface: overlong strings, negative numbers, huge integers, nulls, arrays instead of scalars, objects inside JSON. Watch for 500 errors, stack traces, truncation, or odd behavior."
+      },
+      {
+        "h": "解决办法",
+        "p": "在服务端唯一入口处做白名单校验：明确允许的类型、长度、字符集、取值范围，不符合即拒绝。使用结构化类型（如强类型 ID）而非裸字符串。校验与业务逻辑解耦，形成统一中间件。前端校验仅作体验优化，不作为安全边界。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "黑名单过滤",
+            "bad": "if '<' in user or '>' in user:\n    raise ValueError  # a denylist always leaks",
+            "good": "if not re.fullmatch(r\"[a-zA-Z0-9_-]{1,32}\", user):\n    raise ValueError",
+            "note": "白名单限定字符集与长度，不符合即拒绝",
+            "title_en": "Denylist filtering",
+            "note_en": "An allowlist limits charset and length; anything else is rejected"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Validate with whitelists at the single server entry point: declare allowed type, length, charset, and range, and reject anything else. Use structured types (strong ID types) instead of raw strings. Decouple validation from business logic into shared middleware. Frontend checks optimize experience, not security boundaries."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-20",
+        "url": "https://cwe.mitre.org/data/definitions/20.html"
+      }
+    ],
+    "tags": [
+      "输入校验",
+      "基础"
+    ],
+    "quiz": [
+      {
+        "q": "为什么前端校验不能作为安全边界？",
+        "options": [
+          "因为前端太慢",
+          "因为请求可以绕过页面直接发送，服务端必须独立校验",
+          "因为浏览器不支持",
+          "因为前端代码不可靠"
+        ],
+        "answer": 1,
+        "explain": "绕过 UI 直接调用接口是最基本的攻击手段，安全判定必须在服务端。",
+        "q_en": "Why is frontend validation not a security boundary?",
+        "options_en": [
+          "It is slow",
+          "Requests can bypass the page and hit the API directly",
+          "Browsers lack support",
+          "Frontend code is unreliable"
+        ],
+        "explain_en": "Bypassing the UI to call the API is basic; security decisions belong on the server."
+      },
+      {
+        "q": "白名单校验相比黑名单的优势是？",
+        "options": [
+          "写起来更短",
+          "明确列出允许的集合，未知输入默认拒绝",
+          "性能更好",
+          "不需要测试"
+        ],
+        "answer": 1,
+        "explain": "黑名单要穷举所有坏输入，白名单只需定义好输入。",
+        "q_en": "Advantage of whitelist over blacklist validation?",
+        "options_en": [
+          "Shorter to write",
+          "Explicitly defines the allowed set; unknown input is rejected by default",
+          "Better performance",
+          "No testing needed"
+        ],
+        "explain_en": "Blacklists must enumerate all bad input; whitelists define good input."
+      },
+      {
+        "q": "输入校验应放在哪里？",
+        "options": [
+          "分散在每个业务函数里",
+          "统一在服务端入口处，形成中间件",
+          "只在数据库层",
+          "只在前端"
+        ],
+        "answer": 1,
+        "explain": "集中校验避免遗漏，也便于统一维护规则。",
+        "q_en": "Where should input validation live?",
+        "options_en": [
+          "Scattered across business functions",
+          "Centralized at the server entry point as middleware",
+          "Only in the database",
+          "Only in the frontend"
+        ],
+        "explain_en": "Centralizing avoids gaps and eases maintenance."
+      }
+    ]
+  },
+  {
+    "id": "cwe-287",
+    "kind": "cwe",
+    "category": "认证与会话",
+    "cwe": "CWE-287",
+    "title": "身份认证不当",
+    "title_en": "Improper Authentication",
+    "level": "beginner",
+    "icon": "AUTH",
+    "color": "auth",
+    "summary": "系统没有可靠地确认「你是谁」，导致攻击者可绕过登录或冒用他人身份。",
+    "summary_en": "The system does not reliably verify the identity of a user.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "认证链条上任一环节薄弱都会导致身份被冒用：凭据校验逻辑有缺陷、会话令牌可预测、找回密码流程可绕过、多因素认证可降级。攻击者只需找到最短的那条路径。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Every weak link in the authentication chain leads to identity impersonation: flawed credential verification, predictable session tokens, bypassable password recovery, or degradable MFA. An attacker only needs the shortest path."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "自研加密与散列算法；密码用 MD5 等快速哈希存储且无盐；会话 ID 取自时间戳或自增序列；「记住我」令牌永不过期；第三方登录的回调地址未做校验；默认口令未强制修改。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Home-grown cryptography and hashing; storing passwords with fast hashes like MD5 without salt; session IDs derived from timestamps or auto-increment; never-expiring remember-me tokens; unvalidated OAuth callback URLs; default passwords left unchanged."
+      },
+      {
+        "h": "如何发现",
+        "p": "尝试空密码、默认口令、SQL 注入登入；篡改 Cookie 或 JWT 中的用户标识；观察会话 ID 是否随登录变化、是否可预测；测试密码重置链接是否可重放、是否绑定用户；尝试跳过 MFA 步骤直接访问后续接口。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Try empty passwords, defaults, and SQL injection at login; tamper with user identifiers in cookies or JWTs; check whether the session ID changes on login and whether it is predictable; test reset links for replay and user binding; try skipping MFA to reach later endpoints directly."
+      },
+      {
+        "h": "解决办法",
+        "p": "密码用 bcrypt、scrypt 或 Argon2 加盐慢哈希存储。会话令牌使用密码学安全随机数，登录成功后轮换。所有认证判定在服务端完成，不依赖前端隐藏字段。密码重置令牌一次性、短时效、绑定用户。对登录失败做速率限制与告警。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "MD5 存密码",
+            "bad": "hashlib.md5(password.encode()).hexdigest()",
+            "good": "bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))",
+            "note": "慢哈希 + 每用户独立盐，拖慢离线破解",
+            "title_en": "MD5 for passwords",
+            "note_en": "Slow hash plus a per-user salt makes offline cracking expensive"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Store passwords with salted slow hashes (bcrypt, scrypt, Argon2). Generate session tokens with a CSPRNG and rotate after login. Make all authentication decisions server-side, never relying on hidden frontend fields. Reset tokens should be single-use, short-lived, and user-bound. Rate-limit and alert on failed logins."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-287",
+        "url": "https://cwe.mitre.org/data/definitions/287.html"
+      },
+      {
+        "name": "OWASP Authentication Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "认证",
+      "会话"
+    ],
+    "quiz": [
+      {
+        "q": "存储用户密码应使用？",
+        "options": [
+          "MD5",
+          "加盐的 bcrypt / Argon2 慢哈希",
+          "Base64 编码",
+          "明文加校验位"
+        ],
+        "answer": 1,
+        "explain": "慢哈希配合每用户独立盐，显著提高离线破解成本。",
+        "q_en": "How should user passwords be stored?",
+        "options_en": [
+          "MD5",
+          "Salted bcrypt or Argon2 slow hash",
+          "Base64 encoding",
+          "Plaintext plus a checksum"
+        ],
+        "explain_en": "Slow hashing with per-user salt raises offline cracking cost."
+      },
+      {
+        "q": "会话令牌应该怎么生成？",
+        "options": [
+          "时间戳拼接自增 ID",
+          "密码学安全随机数，登录成功后轮换",
+          "用户名的哈希",
+          "固定字符串"
+        ],
+        "answer": 1,
+        "explain": "可预测的令牌等于没有认证。",
+        "q_en": "How should session tokens be generated?",
+        "options_en": [
+          "Timestamp plus auto-increment ID",
+          "Cryptographically secure random, rotated on login",
+          "Hash of the username",
+          "A fixed string"
+        ],
+        "explain_en": "Predictable tokens are equivalent to no authentication."
+      },
+      {
+        "q": "找回密码的令牌应该具备什么性质？",
+        "options": [
+          "永久有效方便用户",
+          "一次性、短时效、绑定用户",
+          "可被重复使用",
+          "与用户无关"
+        ],
+        "answer": 1,
+        "explain": "可重放的重置链接是账号接管的主要入口之一。",
+        "q_en": "What properties should a password reset token have?",
+        "options_en": [
+          "Valid forever for convenience",
+          "Single use, short lived, bound to the user",
+          "Reusable",
+          "Unrelated to the user"
+        ],
+        "explain_en": "Replayable reset links are a primary account takeover path."
+      }
+    ]
+  },
+  {
+    "id": "cwe-306",
+    "kind": "cwe",
+    "category": "认证与会话",
+    "cwe": "CWE-306",
+    "title": "关键功能缺少认证",
+    "title_en": "Missing Authentication for Critical Function",
+    "level": "beginner",
+    "icon": "NOAU",
+    "color": "auth",
+    "summary": "敏感接口根本没做身份校验，任何人只要知道地址就能调用，常见于内部接口与调试入口。",
+    "summary_en": "A critical function is reachable without any authentication.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "开发时为了联调方便，把管理接口、数据导出接口、设备配置接口直接暴露，且不校验身份。上线时忘记加回鉴权，或因「在内网」而主观认为安全。这类缺陷一旦被扫描到，利用门槛极低。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "During integration, admin, data export, and device configuration endpoints are often exposed without identity checks. When released, authentication is forgotten, or safety is assumed because the service is internal. Once scanned, exploitation is trivial."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "接口按功能开发，鉴权靠网关统一拦截，而某些路径被排除在拦截规则外；微服务之间默认互信；固件、IoT 设备的管理端口直接暴露在公网；测试环境与生产环境共用一套路由。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Features are built per endpoint while auth is centralized at a gateway, and some paths fall outside its rules; microservices trust each other by default; firmware and IoT management ports face the internet; test and production share one route table."
+      },
+      {
+        "h": "如何发现",
+        "p": "对已登录抓到的每个接口，去掉认证头重放，观察是否仍返回数据；用未登录态遍历接口清单；扫描常见管理路径 /admin、/api/internal、/debug、/actuator；对比不同角色账号的返回差异。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Replay every captured endpoint without the auth header and see whether data still returns; enumerate endpoints unauthenticated; scan common admin paths such as /admin, /api/internal, /debug, /actuator; compare responses across roles."
+      },
+      {
+        "h": "解决办法",
+        "p": "鉴权采用默认拒绝：新增路由必须显式声明所需权限，未声明则拒绝。在网关与应用两层都做校验，避免单点失效。管理面与业务面分离部署，管理面不暴露在公网。定期扫描暴露面，把内部接口纳入资产清单。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "鉴权靠网关",
+            "bad": "// The gateway allowlisted /api/internal/**",
+            "good": "// Add application-layer authorization; never rely on the gateway alone\n@PreAuthorize(\"hasRole('ADMIN')\")\n@GetMapping(\"/api/internal/users\")\npublic List<User> listUsers() {\n    return userRepo.findAll();\n}",
+            "note": "网关白名单放行后，应用层仍需独立校验（Spring Security 片段）",
+            "title_en": "Authorization left to the gateway",
+            "note_en": "After the gateway allowlist, the application must still validate independently (Spring Security excerpt)"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Make authorization deny-by-default: new routes must declare required permission or be rejected. Validate at both gateway and application layer to avoid single points of failure. Separate the management plane from the business plane and keep it off the internet. Regularly scan the exposed surface and inventory internal endpoints."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-306",
+        "url": "https://cwe.mitre.org/data/definitions/306.html"
+      }
+    ],
+    "tags": [
+      "认证",
+      "访问控制"
+    ],
+    "quiz": [
+      {
+        "q": "为什么\"部署在内网\"不能替代认证？",
+        "options": [
+          "因为内网更慢",
+          "因为内网也可能被横向渗透，且暴露面会变化",
+          "因为内网不支持 HTTPS",
+          "因为内网带宽小"
+        ],
+        "answer": 1,
+        "explain": "攻击者一旦进入内网，未认证接口就是现成的跳板。",
+        "q_en": "Why does deploy-in-intranet not replace authentication?",
+        "options_en": [
+          "Intranet is slower",
+          "Intranet can be reached via lateral movement, and exposure changes",
+          "Intranet lacks HTTPS",
+          "Bandwidth limits"
+        ],
+        "explain_en": "Once inside, unauthenticated endpoints become ready stepladders."
+      },
+      {
+        "q": "新增路由的鉴权应采用什么策略？",
+        "options": [
+          "默认放行，出事再补",
+          "默认拒绝，必须显式声明所需权限",
+          "按路径长度判断",
+          "按请求方法判断"
+        ],
+        "answer": 1,
+        "explain": "默认拒绝能在遗漏时失败为安全，而不是失败为放行。",
+        "q_en": "What policy should new routes use for authorization?",
+        "options_en": [
+          "Allow by default, patch later",
+          "Deny by default; permissions must be declared explicitly",
+          "Judge by path length",
+          "Judge by HTTP method"
+        ],
+        "explain_en": "Deny by default fails safe when something is forgotten."
+      },
+      {
+        "q": "下面哪种接口最容易被遗漏鉴权？",
+        "options": [
+          "首页",
+          "导出、调试、内部管理这类边缘接口",
+          "登录页",
+          "静态资源"
+        ],
+        "answer": 1,
+        "explain": "边缘接口往往由不同团队开发，容易落在拦截规则之外。",
+        "q_en": "Which endpoints are most often missed for auth?",
+        "options_en": [
+          "Homepage",
+          "Export, debug, and internal admin endpoints",
+          "Login page",
+          "Static assets"
+        ],
+        "explain_en": "Edge endpoints often fall outside interception rules."
+      }
+    ]
+  },
+  {
+    "id": "cwe-862",
+    "kind": "cwe",
+    "category": "访问控制",
+    "cwe": "CWE-862",
+    "title": "缺少授权校验",
+    "title_en": "Missing Authorization",
+    "level": "beginner",
+    "icon": "AUTHZ",
+    "color": "access",
+    "summary": "用户已登录不等于有权访问该资源，缺少对象级授权是水平越权的主要成因。",
+    "summary_en": "Authenticated users can reach resources they are not authorized for.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "认证回答「你是谁」，授权回答「你能做什么」。大量系统只做了前者。典型表现：接口 GET /orders/1001 只校验了登录态，没校验 1001 是否属于当前用户，把 ID 改成 1002 就能读到别人的订单。这叫 IDOR（不安全的直接对象引用）。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Authentication answers who you are; authorization answers what you may do. Many systems implement only the former. The classic symptom: GET /orders/1001 checks only that a session exists, not that order 1001 belongs to you. Change the ID to 1002 and you read someone else's order. This is IDOR."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "把权限判断写在前端菜单里；接口层只做登录拦截，业务层忘记加归属校验；权限模型设计时只考虑角色，没考虑数据归属；批量接口、导出接口、GraphQL 嵌套查询等边缘路径被遗漏。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Permission checks live in frontend menus; the API layer intercepts for login only, and business logic forgets ownership checks; permission models consider roles but not data ownership; batch, export, and GraphQL nested queries are missed."
+      },
+      {
+        "h": "如何发现",
+        "p": "用 A 账号的会话请求 B 账号的资源 ID；修改请求中的用户标识、租户标识、组织 ID；把只读接口改为写操作；遍历自增 ID；检查 GraphQL 是否存在可绕过字段级授权。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Request account B's resource IDs using account A's session; modify user, tenant, or organization identifiers in the request; convert read-only endpoints into writes; enumerate sequential IDs; check for field-level authorization gaps in GraphQL."
+      },
+      {
+        "h": "解决办法",
+        "p": "在每个数据访问点强制注入归属条件（如 WHERE owner_id = current_user），而不是先查后判。采用集中式授权中间件，把「资源 + 动作」作为授权单元。对 ID 使用不可预测的标识降低遍历风险（但不作为唯一防线）。建立越权测试用例纳入回归。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "只判登录",
+            "bad": "@GetMapping(\"/orders/{id}\")\npublic Order get(@PathVariable Long id) {\n    return repo.findById(id).orElseThrow();  // no ownership check",
+            "good": "// Wrong: login checked, ownership not\n@GetMapping(\"/orders/{id}\")\npublic Order getOrder(@PathVariable Long id) {\n    return orderRepo.findById(id).orElseThrow();\n}\n\n// Correct: ownership written straight into the query\n@GetMapping(\"/orders/{id}/safe\")\npublic Order getOrderSafe(@PathVariable Long id, AuthUser me) {\n    return orderRepo.findByIdAndOwnerId(id, me.getId())\n        .orElseThrow(NotFound::new);\n}",
+            "note": "归属条件写进查询，避免「先查后判」的遗漏（Spring Data 片段）",
+            "title_en": "Login checked only",
+            "note_en": "Ownership lives in the query, avoiding check-then-decide gaps (Spring Data excerpt)"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Force an ownership condition into every data access (WHERE owner_id = current_user) instead of fetch-then-check. Adopt centralized authorization middleware keyed on resource plus action. Use unpredictable identifiers to reduce enumeration (never as the only defense). Add privilege-escalation tests to regression suites."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-862",
+        "url": "https://cwe.mitre.org/data/definitions/862.html"
+      },
+      {
+        "name": "OWASP Broken Access Control",
+        "url": "https://owasp.org/Top10/A01_2021-Broken_Access_Control/"
+      }
+    ],
+    "tags": [
+      "授权",
+      "越权",
+      "访问控制"
+    ],
+    "quiz": [
+      {
+        "q": "\"登录成功即拥有全站权限\"对应哪类缺陷？",
+        "options": [
+          "认证绕过",
+          "缺少授权校验（越权）",
+          "SQL 注入",
+          "命令注入"
+        ],
+        "answer": 1,
+        "explain": "认证回答你是谁，授权才回答你能做什么，两者缺一不可。",
+        "q_en": "Logged in equals full site permission. This is?",
+        "options_en": [
+          "Auth bypass",
+          "Missing authorization (broken access control)",
+          "SQL injection",
+          "Command injection"
+        ],
+        "explain_en": "Authentication answers who you are; authorization answers what you may do."
+      },
+      {
+        "q": "防御水平越权最有效的做法是？",
+        "options": [
+          "把资源 ID 加密",
+          "在数据访问点强制注入归属条件",
+          "前端隐藏入口",
+          "增加验证码"
+        ],
+        "answer": 1,
+        "explain": "归属条件写进查询本身，避免\"先查后判\"的遗漏与竞态。",
+        "q_en": "Most effective defense against horizontal privilege escalation?",
+        "options_en": [
+          "Encrypt resource IDs",
+          "Force an ownership condition into the data access query",
+          "Hide entries in the UI",
+          "Add a CAPTCHA"
+        ],
+        "explain_en": "Ownership in the query avoids check-then-act gaps."
+      },
+      {
+        "q": "ID 使用不可预测的标识（如 UUID），能替代授权校验吗？",
+        "options": [
+          "能完全替代",
+          "不能，只是降低被遍历的概率",
+          "能替代一半",
+          "可以省掉登录"
+        ],
+        "answer": 1,
+        "explain": "不可预测只是提高门槛，泄露后仍需要授权判定来兜底。",
+        "q_en": "Can unpredictable IDs (UUID) replace authorization checks?",
+        "options_en": [
+          "Fully",
+          "No; it only lowers the chance of enumeration",
+          "Half",
+          "Login can be skipped"
+        ],
+        "explain_en": "Unpredictability raises the bar but leaks still need authorization."
+      }
+    ]
+  },
+  {
+    "id": "cwe-352",
+    "kind": "cwe",
+    "category": "Web 安全",
+    "cwe": "CWE-352",
+    "title": "跨站请求伪造 CSRF",
+    "title_en": "Cross-Site Request Forgery",
+    "level": "beginner",
+    "icon": "CSRF",
+    "color": "web",
+    "summary": "攻击者诱导已登录用户访问恶意页面，借用户浏览器自动携带的 Cookie 完成非预期操作。",
+    "summary_en": "Forcing a logged-in user's browser to send an unintended authenticated request.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "浏览器同源策略不阻止跨站发起的「请求」，只阻止跨站「读取响应」。因此恶意页面可以构造一个指向目标站的表单并自动提交，浏览器会自动带上目标的 Cookie，服务端看来这就是合法用户的正常请求。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The same-origin policy blocks cross-site reads of responses, not cross-site requests. A malicious page can build a form targeting the victim site and auto-submit it. The browser attaches the victim's cookie, so the server sees a legitimate request."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "状态变更操作使用 GET；Cookie 设置为 SameSite=None 且未做令牌校验；接口同时接受表单与 JSON，攻击者用表单即可绕过预检；把 CSRF 令牌放在 URL 里或可被推测。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "State changes over GET; cookies set to SameSite=None with no token validation; endpoints accepting both form and JSON so a form bypasses preflight; CSRF tokens placed in URLs or made predictable."
+      },
+      {
+        "h": "如何发现",
+        "p": "在本地构造一个最小 HTML 页面，用表单向目标站提交状态变更请求，观察是否生效。检查 Cookie 是否含 SameSite 属性。检查敏感接口是否同时支持 application/x-www-form-urlencoded。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Build a minimal local HTML page with a form submitting a state-changing request to the target and observe whether it takes effect. Check cookies for SameSite. Check whether sensitive endpoints accept application/x-www-form-urlencoded."
+      },
+      {
+        "h": "解决办法",
+        "p": "Cookie 设置 SameSite=Lax 或 Strict 作为基础防线。状态变更接口使用 CSRF Token 并做服务端校验。敏感接口拒绝简单请求（要求自定义头触发预检）。对高危操作增加二次确认或重新认证。",
+        "code": [
+          {
+            "lang": "text",
+            "title": "Cookie 缺 SameSite",
+            "bad": "Set-Cookie: sid=abc123; Path=/; HttpOnly",
+            "good": "Set-Cookie: sid=abc123; Path=/; HttpOnly; SameSite=Lax; Secure",
+            "note": "Lax 已能挡住绝大多数跨站表单提交，再叠加 Token 更稳",
+            "title_en": "Cookie missing SameSite",
+            "note_en": "Lax already blocks most cross-site form posts; adding a token is stronger still"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Set cookies to SameSite=Lax or Strict as the baseline. Validate a CSRF token server-side for state-changing endpoints. Reject simple requests for sensitive endpoints by requiring a custom header that triggers preflight. Add confirmation or re-authentication for high-risk actions."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-352",
+        "url": "https://cwe.mitre.org/data/definitions/352.html"
+      },
+      {
+        "name": "OWASP CSRF",
+        "url": "https://owasp.org/www-community/attacks/csrf"
+      }
+    ],
+    "tags": [
+      "Web",
+      "会话"
+    ],
+    "quiz": [
+      {
+        "q": "Cookie 设置 SameSite=Lax 主要防御什么？",
+        "options": [
+          "XSS",
+          "CSRF",
+          "SQL 注入",
+          "点击劫持"
+        ],
+        "answer": 1,
+        "explain": "跨站发起的状态变更请求默认不带 Cookie，从浏览器层面阻断 CSRF。",
+        "q_en": "SameSite=Lax on cookies primarily defends against?",
+        "options_en": [
+          "XSS",
+          "CSRF",
+          "SQL injection",
+          "Clickjacking"
+        ],
+        "explain_en": "Cross-site state-changing requests stop carrying cookies by default."
+      },
+      {
+        "q": "状态变更操作为什么不应该用 GET？",
+        "options": [
+          "因为 GET 比较慢",
+          "因为 GET 可被图片标签、链接等跨站触发",
+          "因为 GET 不能带参数",
+          "因为 GET 不安全加密"
+        ],
+        "answer": 1,
+        "explain": "GET 是\"安全方法\"，任何页面都能诱发，且容易被预取与缓存。",
+        "q_en": "Why should state-changing operations avoid GET?",
+        "options_en": [
+          "GET is slow",
+          "GET can be triggered cross-site by images or links",
+          "GET cannot carry parameters",
+          "GET is not encrypted"
+        ],
+        "explain_en": "GET is a safe method and can be induced by any page."
+      },
+      {
+        "q": "CSRF Token 应该放在哪里？",
+        "options": [
+          "URL 查询串里",
+          "请求体或自定义头中，由服务端校验",
+          "Cookie 里且无需校验",
+          "前端 localStorage"
+        ],
+        "answer": 1,
+        "explain": "攻击者能构造请求但读不到 Token，无法伪造。",
+        "q_en": "Where should a CSRF token be placed?",
+        "options_en": [
+          "In the URL query string",
+          "In the body or a custom header validated by the server",
+          "In a cookie with no validation",
+          "In frontend localStorage"
+        ],
+        "explain_en": "Attackers can forge requests but cannot read the token."
+      }
+    ]
+  },
+  {
+    "id": "cwe-918",
+    "kind": "cwe",
+    "category": "Web 安全",
+    "cwe": "CWE-918",
+    "title": "服务端请求伪造 SSRF",
+    "title_en": "Server-Side Request Forgery",
+    "level": "intermediate",
+    "icon": "SSRF",
+    "color": "web",
+    "summary": "服务端按用户提供的地址发起请求，攻击者借此探测内网、访问云元数据接口、攻击内部服务。",
+    "summary_en": "The server fetches a user-supplied URL, reaching internal networks.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "凡是「你给链接我来抓」的功能都可能是 SSRF 入口：图片转存、网页截图、Webhook 测试、PDF 生成、URL 预览。服务端所处的位置往往在内网，能访问到公网不可达的资产，包括云厂商的元数据服务（如 169.254.169.254）。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Any feature that fetches a user-supplied URL is a potential SSRF entry: image proxying, page screenshots, webhook testing, PDF generation, link previews. The server typically sits inside a network and can reach assets unreachable from the internet, including cloud metadata services such as 169.254.169.254."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "只对域名做黑名单校验；校验后再请求之间存在 DNS 重绑定窗口；允许 302 跳转，跳转目标是内网地址；支持 file:// gopher:// dict:// 等非 HTTP 协议；云主机实例角色权限过大。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Blacklisting domain names only; a DNS rebinding window between check and request; allowing 302 redirects whose target is internal; supporting file://, gopher://, and dict://; over-privileged instance roles on cloud hosts."
+      },
+      {
+        "h": "如何发现",
+        "p": "把 URL 参数替换为 http://127.0.0.1:端口、http://[::1]、http://169.254.169.254/latest/meta-data/、内网段地址；用 DNS 重绑定服务；观察响应时间差异判断端口开放情况。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Replace URL parameters with http://127.0.0.1:port, http://[::1], http://169.254.169.254/latest/meta-data/, and internal ranges; use DNS rebinding services; compare response times to infer open ports."
+      },
+      {
+        "h": "解决办法",
+        "p": "采用白名单：只允许特定域名或 IP 段。请求前解析域名并校验 IP 不属于私有段、回环、链路本地，且在整个请求生命周期内锁定已解析的 IP，防重绑定。禁止非 HTTP(S) 协议，禁用或限制跳转。云上收紧实例角色权限，启用 IMDSv2。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "直接请求用户 URL",
+            "bad": "requests.get(user_url)",
+            "good": "ip = ipaddress.ip_address(socket.gethostbyname(host))\nif ip.is_private or ip.is_loopback or ip.is_link_local:\n    raise ValueError\nrequests.get(user_url, allow_redirects=False)",
+            "note": "解析后判断 IP 段，并关闭跳转防止绕过",
+            "title_en": "Requesting a user-supplied URL directly",
+            "note_en": "Judge the address block after resolution and disable redirects to prevent bypass"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use whitelists allowing only specific domains or ranges. Resolve the domain before the request and reject private, loopback, and link-local IPs, pinning the resolved IP for the request lifetime to prevent rebinding. Disallow non-HTTP(S) schemes and restrict redirects. Tighten instance role permissions and enable IMDSv2."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-918",
+        "url": "https://cwe.mitre.org/data/definitions/918.html"
+      },
+      {
+        "name": "OWASP SSRF",
+        "url": "https://owasp.org/www-community/attacks/Server_Side_Request_Forgery"
+      }
+    ],
+    "tags": [
+      "Web",
+      "内网",
+      "SSRF"
+    ],
+    "quiz": [
+      {
+        "q": "为什么只做域名黑名单不足以防 SSRF？",
+        "options": [
+          "黑名单太慢",
+          "存在 DNS 重绑定、跳转、编码等等价变形",
+          "黑名单不支持中文",
+          "因为 HTTPS"
+        ],
+        "answer": 1,
+        "explain": "解析结果可能在检查后被改变，必须以解析到的 IP 为准并锁定。",
+        "q_en": "Why is a domain blacklist insufficient against SSRF?",
+        "options_en": [
+          "Blacklists are slow",
+          "DNS rebinding, redirects, and encoding variants bypass it",
+          "No Unicode support",
+          "HTTPS issues"
+        ],
+        "explain_en": "Resolve and pin the IP, since the parsed address can change after checking."
+      },
+      {
+        "q": "169.254.169.254 这个地址的特殊之处是？",
+        "options": [
+          "它是广播地址",
+          "它是云厂商元数据服务，可能返回实例凭据",
+          "它是本地回环",
+          "它是 DNS 服务器"
+        ],
+        "answer": 1,
+        "explain": "SSRF 命中元数据服务往往直接导致云账号接管。",
+        "q_en": "Why is 169.254.169.254 special?",
+        "options_en": [
+          "It is broadcast",
+          "It is the cloud metadata service, possibly returning instance credentials",
+          "It is loopback",
+          "It is DNS"
+        ],
+        "explain_en": "SSRF hitting metadata often leads to full cloud account takeover."
+      },
+      {
+        "q": "防 SSRF 时应如何处理跳转？",
+        "options": [
+          "允许 10 次跳转",
+          "禁用跳转，或对每一跳重新校验目标",
+          "只允许 https 跳转",
+          "跳转后不再校验"
+        ],
+        "answer": 1,
+        "explain": "跳转是绕过首次校验的经典手法。",
+        "q_en": "How should redirects be handled against SSRF?",
+        "options_en": [
+          "Allow up to 10 hops",
+          "Disable redirects or re-validate each hop",
+          "Allow only HTTPS redirects",
+          "Do not revalidate"
+        ],
+        "explain_en": "Redirects are a classic way to bypass the first check."
+      }
+    ]
+  },
+  {
+    "id": "cwe-611",
+    "kind": "cwe",
+    "category": "配置与解析",
+    "cwe": "CWE-611",
+    "title": "XML 外部实体注入 XXE",
+    "title_en": "XML External Entity",
+    "level": "intermediate",
+    "icon": "XXE",
+    "color": "parse",
+    "summary": "XML 解析器默认允许引用外部实体，攻击者借此读本地文件、探测内网、发起 SSRF 或拒绝服务。",
+    "summary_en": "XML parsers resolving external entities enable file disclosure and SSRF.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "XML 规范允许在 DOCTYPE 中定义实体，实体值可以是 file:// 或 http:// 地址，解析时会被展开进文档。若解析器开启外部实体解析，攻击者提交含实体的 XML 即可让服务端读文件并把内容回显到响应中。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "XML allows entities defined in DOCTYPE whose value can be a file:// or http:// address, expanded during parsing. If the parser resolves external entities, an attacker submitting XML with such an entity can make the server read local files and echo them back."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "多数语言的标准 XML 库历史默认开启 DTD 处理；开发者只关注业务字段，忽略解析器安全配置；SOAP、SVG、Office 文档、SAML 断言等场景都走 XML 解析；组件升级时配置回退。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Historically most standard XML libraries enabled DTD processing by default; developers focus on business fields and ignore parser security; SOAP, SVG, Office documents, and SAML assertions all go through XML parsing; configuration regresses on upgrades."
+      },
+      {
+        "h": "如何发现",
+        "p": "提交带 <!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><x>&e;</x> 的 XML，观察响应是否包含文件内容；用 http:// 实体探测回连；用嵌套实体测试是否存在指数展开（Billion Laughs）。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Submit XML containing <!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><x>&e;</x> and check whether the response includes file contents; use an http:// entity to probe callbacks; test nested entities for exponential expansion (Billion Laughs)."
+      },
+      {
+        "h": "解决办法",
+        "p": "最彻底的做法是禁用 DTD 与外部实体解析（Java 的 disallow-doctype-decl、Python lxml 的 resolve_entities=False 等）。若业务不需要 XML，改用 JSON。确实需要 DTD 时启用白名单校验。对上传的 Office、SVG 等含 XML 的格式做同等级过滤。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "默认 XML 解析",
+            "bad": "DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();\nDocumentBuilder b = f.newDocumentBuilder();",
+            "good": "DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();\nf.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true);\nf.setFeature(\"http://xml.org/sax/features/external-general-entities\", false);\nf.setFeature(\"http://xml.org/sax/features/external-parameter-entities\", false);",
+            "note": "直接禁止 DOCTYPE，XXE 无从下手",
+            "title_en": "Default XML parser",
+            "note_en": "Forbidding DOCTYPE outright leaves XXE no foothold"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "The most thorough fix disables DTD and external entity resolution (Java disallow-doctype-decl, Python lxml resolve_entities=False). If XML is not needed, switch to JSON. When DTD is required, enforce whitelist validation. Apply the same filtering to uploaded Office and SVG files that contain XML."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-611",
+        "url": "https://cwe.mitre.org/data/definitions/611.html"
+      },
+      {
+        "name": "OWASP XXE Prevention",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "XML",
+      "解析",
+      "文件读取"
+    ],
+    "quiz": [
+      {
+        "q": "XXE 最根本的防护是？",
+        "options": [
+          "过滤文件路径关键字",
+          "禁用 DTD 与外部实体解析",
+          "限制响应长度",
+          "加密传输"
+        ],
+        "answer": 1,
+        "explain": "不解析 DOCTYPE 就没有实体展开，攻击面直接消失。",
+        "q_en": "Most fundamental XXE defense?",
+        "options_en": [
+          "Filter file path keywords",
+          "Disable DTD and external entity resolution",
+          "Limit response size",
+          "Encrypt transport"
+        ],
+        "explain_en": "No DOCTYPE means no entity expansion, removing the attack surface."
+      },
+      {
+        "q": "下面哪种文件同样可能引入 XXE？",
+        "options": [
+          "纯文本 txt",
+          "SVG、Office 文档、SAML 断言等含 XML 的格式",
+          "PNG 图片",
+          "CSV 表格"
+        ],
+        "answer": 1,
+        "explain": "任何走 XML 解析器的格式都在风险范围内。",
+        "q_en": "Which file types can also introduce XXE?",
+        "options_en": [
+          "Plain text",
+          "SVG, Office documents, SAML assertions and other XML formats",
+          "PNG images",
+          "CSV tables"
+        ],
+        "explain_en": "Anything parsed by an XML parser is in scope."
+      },
+      {
+        "q": "业务不需要 XML 时，最佳做法是？",
+        "options": [
+          "仍然用 XML 但加过滤",
+          "改用 JSON 等纯数据格式",
+          "把 XML 压缩",
+          "用 base64 包装 XML"
+        ],
+        "answer": 1,
+        "explain": "减少一种解析器就减少一类攻击面。",
+        "q_en": "If the business does not need XML, the best move is?",
+        "options_en": [
+          "Keep XML but add filters",
+          "Switch to JSON or another pure data format",
+          "Compress the XML",
+          "Wrap XML in base64"
+        ],
+        "explain_en": "Removing a parser removes a class of attack surface."
+      }
+    ]
+  },
+  {
+    "id": "cwe-434",
+    "kind": "cwe",
+    "category": "文件与上传",
+    "cwe": "CWE-434",
+    "title": "不受限的文件上传",
+    "title_en": "Unrestricted File Upload",
+    "level": "beginner",
+    "icon": "UPLD",
+    "color": "file",
+    "summary": "上传接口未限制文件类型与落地位置，攻击者可上传可执行脚本并获得服务器权限。",
+    "summary_en": "Unrestricted uploads can place executable content on the server.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "如果上传目录位于 Web 根目录下，且文件扩展名被 Web 服务器当作可执行脚本处理（如 .php、.jsp、.asp），上传一个含恶意代码的文件再访问它，就能在服务器上执行任意代码。即使不能执行，也可用于存放钓鱼页面、恶意文件分发。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "If uploads land inside the web root and the web server executes extensions such as .php, .jsp, or .asp, uploading a file containing malicious code and requesting it runs attacker code on the server. Even without execution, it can host phishing pages or malware distribution."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "只校验前端 accept 属性或扩展名黑名单；允许 .php5、.phtml、.phar 等变体；上传目录与静态资源目录混用；文件名由用户完全控制，可配合路径穿越写到任意位置；解压上传的压缩包时未校验条目。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Validating only the frontend accept attribute or an extension blacklist; allowing variants such as .php5, .phtml, .phar; mixing upload directories with static asset directories; filenames fully user-controlled and combined with path traversal to write anywhere; extracting uploaded archives without validating entries."
+      },
+      {
+        "h": "如何发现",
+        "p": "尝试上传 .php、.phtml、双扩展名 shell.php.jpg、大小写混合 .PhP、含空字节的文件名；上传后直接访问返回的 URL；检查响应是否回显服务器绝对路径。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Upload .php, .phtml, double extensions like shell.php.jpg, mixed-case .PhP, and filenames with null bytes; then request the returned URL; check whether responses reveal absolute server paths."
+      },
+      {
+        "h": "解决办法",
+        "p": "白名单校验扩展名与 MIME（以文件头魔数为准，不信任客户端声明）。文件名由服务端重新生成（UUID），不保留用户原始名。上传目录放在 Web 根之外，通过受控的下载接口提供文件。上传目录禁用脚本执行。图片类文件做二次编码以剥离潜在载荷。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "信任扩展名",
+            "bad": "f.save(os.path.join(UPLOAD_DIR, f.filename))",
+            "good": "ext = detect_by_magic(f.read(16))   # read the header to determine the real type\nif ext not in {\"png\",\"jpg\",\"pdf\"}:\n    raise ValueError\nname = uuid4().hex + \".\" + ext\nf.save(os.path.join(UPLOAD_DIR, name))",
+            "note": "以文件头为准，文件名由服务端生成",
+            "title_en": "Trusting the extension",
+            "note_en": "Trust the file header and let the server generate the filename"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Whitelist extensions and MIME based on magic bytes, never trusting client declarations. Generate server-side filenames (UUID) and discard the original. Keep uploads outside the web root and serve them through a controlled download endpoint. Disable script execution in upload directories. Re-encode images to strip potential payloads."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-434",
+        "url": "https://cwe.mitre.org/data/definitions/434.html"
+      }
+    ],
+    "tags": [
+      "文件",
+      "上传",
+      "RCE"
+    ],
+    "quiz": [
+      {
+        "q": "判断上传文件真实类型最可靠的方式是？",
+        "options": [
+          "看扩展名",
+          "看请求头里的 Content-Type",
+          "读文件头魔数",
+          "看文件大小"
+        ],
+        "answer": 2,
+        "explain": "前两者都由客户端声明，可随意伪造；魔数来自文件内容本身。",
+        "q_en": "Most reliable way to determine a file's real type on upload?",
+        "options_en": [
+          "Extension",
+          "Content-Type header",
+          "File magic bytes",
+          "File size"
+        ],
+        "explain_en": "The first two are client-declared; magic bytes come from content."
+      },
+      {
+        "q": "上传文件保存时应如何处理文件名？",
+        "options": [
+          "沿用用户提供的名字",
+          "由服务端重新生成 UUID 名字",
+          "用时间戳加原扩展名",
+          "用文件的哈希并保留原名"
+        ],
+        "answer": 1,
+        "explain": "避免路径穿越、覆盖写与执行两类风险。",
+        "q_en": "How should uploaded filenames be handled?",
+        "options_en": [
+          "Keep the original name",
+          "Generate a server-side UUID name",
+          "Timestamp plus original extension",
+          "Hash plus original name"
+        ],
+        "explain_en": "Prevents path traversal, overwrites, and execution risks."
+      },
+      {
+        "q": "上传目录与 Web 根目录的关系应该是？",
+        "options": [
+          "放在 Web 根目录下方便访问",
+          "放在 Web 根之外，通过受控接口提供",
+          "用软链接指过去",
+          "无所谓"
+        ],
+        "answer": 1,
+        "explain": "即使上传了脚本也无法被直接执行。",
+        "q_en": "Where should uploads be stored relative to the web root?",
+        "options_en": [
+          "Under the web root for easy access",
+          "Outside the web root, served through a controlled endpoint",
+          "Via a symlink",
+          "Anywhere"
+        ],
+        "explain_en": "Even an uploaded script cannot be executed directly."
+      }
+    ]
+  },
+  {
+    "id": "cwe-798",
+    "kind": "cwe",
+    "category": "凭据管理",
+    "cwe": "CWE-798",
+    "title": "硬编码凭据",
+    "title_en": "Hard-coded Credentials",
+    "level": "beginner",
+    "icon": "HARD",
+    "color": "secret",
+    "summary": "账号密码、API Key、私钥被写死在源码或固件里，一旦泄露即无法快速吊销。",
+    "summary_en": "Credentials embedded in source code or firmware cannot be rotated.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "为图方便把凭据写进代码、配置文件、镜像层、固件二进制。源码一旦进入代码仓库、镜像一旦被拉取、固件一旦被拆解，凭据就等同公开。更麻烦的是同一凭据往往在成百上千台设备上复用，无法逐台吊销。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "For convenience, credentials are written into code, config files, image layers, or firmware. Once source reaches a repository, an image is pulled, or firmware is unpacked, the credential is effectively public. Worse, one credential is often reused across thousands of devices and cannot be revoked individually."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "本地开发图省事，提交时忘记移除；CI 配置里明文写密钥；前端代码里集成第三方服务密钥；固件出厂默认口令全批次相同；历史提交记录里残留密钥，即使后来删除。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Local development convenience with the credential left in at commit; plaintext secrets in CI config; third-party keys embedded in frontend code; a single factory default password for a whole batch; secrets lingering in historical commits even after removal."
+      },
+      {
+        "h": "如何发现",
+        "p": "对仓库全历史做密钥扫描（含已删除文件）；对镜像层逐层检查；对固件 binwalk 提取文件系统后搜索；检查前端打包产物中的字符串常量。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Scan the full repository history including deleted files; inspect every image layer; run binwalk on firmware and search the extracted filesystem; check string constants in frontend bundles."
+      },
+      {
+        "h": "解决办法",
+        "p": "凭据一律外置到环境变量或密钥管理服务，代码只引用变量名。接入密钥扫描作为提交前钩子。已泄露的凭据立即吊销并轮换，而不是仅从代码中删除。设备类产品采用首次开机强制改密或一机一密。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "硬编码",
+            "bad": "String key = \"sk-live-8f3a2b...\";",
+            "good": "String key = System.getenv(\"APP_API_KEY\");\nif (key == null) throw new IllegalStateException(\"APP_API_KEY is not set\");",
+            "note": "代码只写变量名，值由运行环境注入",
+            "title_en": "Hardcoded",
+            "note_en": "The code holds only a variable name; the environment injects the value"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Externalize credentials to environment variables or a secret manager; code references only variable names. Add secret scanning as a pre-commit hook. Revoke and rotate leaked credentials immediately rather than only deleting them from code. For devices, force a password change on first boot or provision per-device secrets."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-798",
+        "url": "https://cwe.mitre.org/data/definitions/798.html"
+      },
+      {
+        "name": "OWASP Secrets Management",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "凭据",
+      "配置"
+    ],
+    "quiz": [
+      {
+        "q": "发现代码里硬编码了生产密钥，第一步应该是？",
+        "options": [
+          "从代码里删掉即可",
+          "立即吊销并轮换该密钥",
+          "改成 base64 编码",
+          "移到注释里"
+        ],
+        "answer": 1,
+        "explain": "删除代码挡不住已被复制的副本，吊销才是止损。",
+        "q_en": "You find a hard-coded production key. First step?",
+        "options_en": [
+          "Delete it from code",
+          "Revoke and rotate the key immediately",
+          "Base64-encode it",
+          "Move it to a comment"
+        ],
+        "explain_en": "Deleting code does not invalidate copies; revocation is the real fix."
+      },
+      {
+        "q": "git 历史里残留的密钥，删除文件后就安全了吗？",
+        "options": [
+          "是",
+          "否，历史提交仍可检出，需要清理历史或吊销凭据",
+          "取决于仓库大小",
+          "取决于是否私有"
+        ],
+        "answer": 1,
+        "explain": "历史是全量留存的，必须按泄露处置。",
+        "q_en": "Is a key removed from a file gone from git?",
+        "options_en": [
+          "Yes",
+          "No, history still contains it; clean history or revoke",
+          "Depends on repo size",
+          "Depends on visibility"
+        ],
+        "explain_en": "History is retained in full and must be treated as leaked."
+      },
+      {
+        "q": "前端代码里放第三方 API Key，为什么不可行？",
+        "options": [
+          "因为体积变大",
+          "因为打包产物可被直接读取",
+          "因为浏览器不支持",
+          "因为跨域限制"
+        ],
+        "answer": 1,
+        "explain": "前端没有任何秘密可言，密钥必须留在服务端。",
+        "q_en": "Why can't a third-party API key live in frontend code?",
+        "options_en": [
+          "Bundle size",
+          "The built artifact can be read directly",
+          "Browser limits",
+          "CORS restrictions"
+        ],
+        "explain_en": "The frontend holds no secrets; keys belong on the server."
+      }
+    ]
+  },
+  {
+    "id": "cwe-362",
+    "kind": "cwe",
+    "category": "并发与时序",
+    "cwe": "CWE-362",
+    "title": "竞态条件",
+    "title_en": "Race Condition",
+    "level": "advanced",
+    "icon": "RACE",
+    "color": "concurrency",
+    "summary": "多线程或多次请求下，检查与使用之间存在时间窗口，攻击者可让两者状态不一致。",
+    "summary_en": "A time gap between check and use lets state become inconsistent.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "典型模式是 TOCTOU（检查时与使用时不一致）：程序先检查资源是否可用，再执行操作，两步之间资源状态可能被其他线程或请求改变。在并发场景下，攻击者可以让同一个一次性资源被使用多次。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The classic pattern is TOCTOU: the program checks resource availability, then acts, and between the two the state can change due to another thread or request. Under concurrency an attacker can make a single-use resource be consumed multiple times."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "检查与操作分离且未加锁；使用非原子操作实现「读-改-写」；数据库事务隔离级别过低；文件系统的符号链接检查后又被替换；业务上依赖「先查询余额再扣款」这类非原子流程。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Check and action are separated without locking; read-modify-write implemented with non-atomic operations; transaction isolation set too low; a filesystem path checked for symlinks and then replaced; business flows relying on query-balance-then-deduct."
+      },
+      {
+        "h": "如何发现",
+        "p": "对同一资源并发提交大量请求，观察是否出现重复使用；对限购、提现、优惠券等业务做并发测试；代码审查中搜索先查询后更新的模式。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Submit many concurrent requests against one resource and look for double use; run concurrency tests on purchase limits, withdrawals, and coupons; grep code for query-then-update patterns."
+      },
+      {
+        "h": "解决办法",
+        "p": "把检查与操作合并为原子操作：数据库层用条件更新（UPDATE ... WHERE status='unused'）并检查影响行数；使用行锁、唯一约束、分布式锁。文件操作使用 O_EXCL 或先创建临时文件再原子重命名。业务层引入幂等键。",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "先查后改",
+            "bad": "SELECT stock FROM goods WHERE id = 1;\n-- Application checks stock > 0, then UPDATEs",
+            "good": "UPDATE goods SET stock = stock - 1\n WHERE id = 1 AND stock > 0;\n-- Zero affected rows means the claim failed",
+            "note": "把判断并进 UPDATE，由数据库保证原子性",
+            "title_en": "Check then modify",
+            "note_en": "Fold the check into the UPDATE so the database guarantees atomicity"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Merge check and action into one atomic operation: conditional updates at the database layer (UPDATE ... WHERE status='unused') with affected-row checks; row locks, unique constraints, or distributed locks. Use O_EXCL or create-then-rename atomically for files. Introduce idempotency keys at the business layer."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-362",
+        "url": "https://cwe.mitre.org/data/definitions/362.html"
+      }
+    ],
+    "tags": [
+      "并发",
+      "业务逻辑"
+    ],
+    "quiz": [
+      {
+        "q": "「先查询库存再扣减」的问题在于？",
+        "options": [
+          "查询太慢",
+          "检查与更新之间存在时间窗口，可被并发重复利用",
+          "语法不合法",
+          "无法索引"
+        ],
+        "answer": 1,
+        "explain": "两个请求都通过检查后再各自扣减，超卖就发生了。",
+        "q_en": "Problem with check stock then decrement?",
+        "options_en": [
+          "Query is slow",
+          "A time gap between check and update allows concurrent reuse",
+          "Invalid syntax",
+          "Cannot index"
+        ],
+        "explain_en": "Both requests pass the check before either decrements, causing oversell."
+      },
+      {
+        "q": "用 UPDATE ... WHERE stock > 0 并检查影响行数，属于哪种防护？",
+        "options": [
+          "加锁",
+          "把检查与操作合并为原子操作",
+          "输入校验",
+          "限流"
+        ],
+        "answer": 1,
+        "explain": "由数据库保证原子性，是并发场景最可靠的做法。",
+        "q_en": "UPDATE ... WHERE stock > 0 plus affected-row check is which defense?",
+        "options_en": [
+          "Locking",
+          "Merging check and action into one atomic operation",
+          "Input validation",
+          "Rate limiting"
+        ],
+        "explain_en": "The database guarantees atomicity, the most reliable concurrent fix."
+      },
+      {
+        "q": "创建临时文件时使用 O_EXCL 的作用是？",
+        "options": [
+          "提升写入速度",
+          "保证文件不存在才创建，避免竞态覆盖",
+          "加密文件",
+          "压缩文件"
+        ],
+        "answer": 1,
+        "explain": "原子性创建避免\"检查时不存在、使用时被替换\"。",
+        "q_en": "What does O_EXCL provide when creating temp files?",
+        "options_en": [
+          "Write speed",
+          "Atomic create-if-absent, preventing race overwrite",
+          "Encryption",
+          "Compression"
+        ],
+        "explain_en": "Atomic creation avoids check-absent-then-replaced races."
+      }
+    ]
+  },
+  {
+    "id": "cwe-190",
+    "kind": "cwe",
+    "category": "数值处理",
+    "cwe": "CWE-190",
+    "title": "整数溢出",
+    "title_en": "Integer Overflow",
+    "level": "intermediate",
+    "icon": "INT",
+    "color": "numeric",
+    "summary": "数值运算超出类型表示范围后回绕，导致长度计算错误、分配过小，进而引发越界访问。",
+    "summary_en": "Arithmetic exceeds the type's range and wraps, corrupting size math.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "无符号整数溢出后回绕到接近 0 的小值。若这个值被用作内存分配大小或拷贝长度，实际需要的空间远大于分配的空间，后续写入就会越界。有符号整数溢出在部分语言中属未定义行为，可能被编译器优化出意外结果。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "An unsigned integer that overflows wraps to a value near zero. If that value is used as an allocation size or copy length, the actual required space far exceeds what was allocated, and subsequent writes go out of bounds. Signed overflow is undefined behavior in some languages and can be optimized into surprises."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "把用户提供的长度、数量直接参与运算；两个大数相加后作为分配大小；类型转换时窄化（u64 转 u32）未校验；用 int 表示字节数，超过 2GB 时溢出。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "User-provided lengths and counts used directly in arithmetic; two large numbers added to compute an allocation size; narrowing conversions (u64 to u32) without validation; using int for byte counts that exceed 2 GB."
+      },
+      {
+        "h": "如何发现",
+        "p": "开启有符号整数溢出检测（Rust 默认 debug 模式会 panic，C/C++ 用 UBSan）；fuzzing 输入极大数值；静态分析工具标记可疑的类型窄化点。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Enable signed overflow detection (Rust panics in debug; C/C++ with UBSan); fuzz with extreme numeric values; static analysis flags suspicious narrowing points."
+      },
+      {
+        "h": "解决办法",
+        "p": "运算使用 checked_ 系列接口（checked_add、checked_mul）并处理 None 分支。分配前做上界校验。使用足够宽的整数类型表示字节数。对来自外部的数值先范围校验再参与运算。",
+        "code": [
+          {
+            "lang": "rust",
+            "title": "直接相乘",
+            "bad": "let size = width * height;\nlet buf = vec![0u8; size];",
+            "good": "let size = width.checked_mul(height).ok_or(Error::Overflow)?;\nif size > MAX_LEN { return Err(Error::TooLarge); }\nlet buf = vec![0u8; size];",
+            "note": "溢出与超限都在分配前拦下",
+            "title_en": "Direct multiplication",
+            "note_en": "Block overflow and excess before allocating"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use checked_ variants (checked_add, checked_mul) and handle None. Validate upper bounds before allocation. Pick a wide enough integer type for byte counts. Range-check external numbers before arithmetic."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-190",
+        "url": "https://cwe.mitre.org/data/definitions/190.html"
+      }
+    ],
+    "tags": [
+      "数值",
+      "内存"
+    ],
+    "quiz": [
+      {
+        "q": "无符号整数溢出后会发生什么？",
+        "options": [
+          "自动变大",
+          "回绕到接近 0 的小值",
+          "抛出异常",
+          "变成负数"
+        ],
+        "answer": 1,
+        "explain": "回绕成小值后若被用作分配大小，后续写入就会越界。",
+        "q_en": "What happens after unsigned integer overflow?",
+        "options_en": [
+          "It grows",
+          "It wraps to a value near zero",
+          "It throws",
+          "It becomes negative"
+        ],
+        "explain_en": "A wrapped small value used as allocation size causes subsequent OOB writes."
+      },
+      {
+        "q": "Rust 中安全的乘法写法是？",
+        "options": [
+          "直接相乘",
+          "checked_mul 并处理 None",
+          "用浮点替代",
+          "加 saturating 修饰"
+        ],
+        "answer": 1,
+        "explain": "checked 系列在溢出时返回 None，强制调用方处理。",
+        "q_en": "Safe multiplication in Rust?",
+        "options_en": [
+          "Multiply directly",
+          "checked_mul and handle None",
+          "Use floats",
+          "Saturate instead"
+        ],
+        "explain_en": "checked_* returns None on overflow, forcing the caller to handle it."
+      },
+      {
+        "q": "为什么用 int 表示字节数可能有问题？",
+        "options": [
+          "int 精度不够存储小文件",
+          "超过约 2GB 时会溢出",
+          "int 不能相加",
+          "int 不可序列化"
+        ],
+        "answer": 1,
+        "explain": "大文件场景应使用足够宽的整数类型。",
+        "q_en": "Why is int risky for byte counts?",
+        "options_en": [
+          "Insufficient precision for small files",
+          "Overflows past roughly 2 GB",
+          "Cannot be added",
+          "Not serializable"
+        ],
+        "explain_en": "Large files need a wide enough integer type."
+      }
+    ]
+  },
+  {
+    "id": "cwe-125",
+    "kind": "cwe",
+    "category": "内存安全",
+    "cwe": "CWE-125",
+    "title": "越界读取",
+    "title_en": "Out-of-bounds Read",
+    "level": "advanced",
+    "icon": "OOBR",
+    "color": "memory",
+    "summary": "程序读取了缓冲区边界之外的内存，可能泄露敏感数据，也可能因读到非法地址而崩溃。",
+    "summary_en": "Reading past a buffer boundary leaks memory or crashes the process.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "与越界写入相对，越界读取不破坏内存，但会把相邻区域的内容当作正常数据返回给攻击者。如果相邻区域存放的是密钥、其他用户的数据或指针值，就构成信息泄露，可作为进一步利用的跳板（绕过 ASLR）。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The mirror of out-of-bounds write: an OOB read does not corrupt memory but returns adjacent contents to the attacker. If the neighboring region holds keys, other users' data, or pointer values, that is an information leak usable to bypass ASLR."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "数组索引未做上界检查；字符串处理依赖不可靠的长度字段；解析二进制格式时信任文件头声明的长度；循环条件写错。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Array indexes without upper-bound checks; string handling trusting unreliable length fields; parsing binary formats by trusting a header-declared length; wrong loop conditions."
+      },
+      {
+        "h": "如何发现",
+        "p": "AddressSanitizer 检测堆越界读；Valgrind；向解析器灌入畸形输入 fuzzing；观察响应中是否出现非预期内容。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "AddressSanitizer detects heap OOB reads; Valgrind; fuzz parsers with malformed input; watch for unexpected content in responses."
+      },
+      {
+        "h": "解决办法",
+        "p": "使用带边界检查的容器与访问接口。解析外部格式前先校验声明的长度与实际可用字节数。编译器加固与 ASan 纳入 CI。",
+        "code": [
+          {
+            "lang": "c",
+            "title": "按声明长度读取",
+            "bad": "memcpy(buf, src, hdr->len);   // len comes from the file header",
+            "good": "if (hdr->len > remaining_bytes(src)) return ERR_TRUNCATED;\nmemcpy(buf, src, hdr->len);",
+            "note": "解析二进制格式时，声明长度必须与真实可用长度核对",
+            "title_en": "Reading by declared length",
+            "note_en": "When parsing binary formats, the declared length must be checked against what is actually available"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use bounds-checked containers and accessors. Verify declared length against actually available bytes before parsing external formats. Keep compiler hardening and ASan in CI."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-125",
+        "url": "https://cwe.mitre.org/data/definitions/125.html"
+      }
+    ],
+    "tags": [
+      "内存",
+      "信息泄露"
+    ],
+    "quiz": [
+      {
+        "q": "越界读取可能造成的最隐蔽后果是？",
+        "options": [
+          "进程变慢",
+          "把相邻内存的敏感数据返回给攻击者",
+          "磁盘占满",
+          "日志变多"
+        ],
+        "answer": 1,
+        "explain": "不破坏数据但泄露内存内容，可用于绕过 ASLR。",
+        "q_en": "Most insidious consequence of out-of-bounds read?",
+        "options_en": [
+          "Slower process",
+          "Returning adjacent sensitive memory to the attacker",
+          "Disk full",
+          "More logs"
+        ],
+        "explain_en": "It does not corrupt data but leaks memory, useful for bypassing ASLR."
+      },
+      {
+        "q": "解析二进制格式时，最关键的校验是？",
+        "options": [
+          "检查文件扩展名",
+          "核对文件头声明的长度与实际可用字节数",
+          "检查文件大小是否是偶数",
+          "检查时间戳"
+        ],
+        "answer": 1,
+        "explain": "信任声明长度就会被诱导越界读写。",
+        "q_en": "Most critical check when parsing binary formats?",
+        "options_en": [
+          "File extension",
+          "Verify declared length against actually available bytes",
+          "Even file size",
+          "Timestamp"
+        ],
+        "explain_en": "Trusting declared length invites OOB read and write."
+      },
+      {
+        "q": "AddressSanitizer 能检测什么？",
+        "options": [
+          "SQL 注入",
+          "堆栈越界读写与释放后使用",
+          "XSS",
+          "弱口令"
+        ],
+        "answer": 1,
+        "explain": "ASan 是内存错误的运行时检测器，应纳入 CI。",
+        "q_en": "What does AddressSanitizer detect?",
+        "options_en": [
+          "SQL injection",
+          "Heap and stack OOB access and use-after-free",
+          "XSS",
+          "Weak passwords"
+        ],
+        "explain_en": "ASan is a runtime memory error detector and belongs in CI."
+      }
+    ]
+  },
+  {
+    "id": "cwe-476",
+    "kind": "cwe",
+    "category": "内存安全",
+    "cwe": "CWE-476",
+    "title": "空指针解引用",
+    "title_en": "NULL Pointer Dereference",
+    "level": "beginner",
+    "icon": "NULL",
+    "color": "memory",
+    "summary": "程序访问了空指针，通常直接崩溃，是最常见的拒绝服务成因之一。",
+    "summary_en": "Dereferencing a NULL pointer typically crashes the process.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "对象查找失败、内存分配失败、初始化未完成时返回空指针，调用方未判断即访问其成员。在服务端表现为进程崩溃，可被反复触发形成拒绝服务；在内核或特权进程中可能被进一步利用。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Object lookup failures, allocation failures, or incomplete initialization return null pointers that callers dereference without checking. In services this appears as crashes, repeatable for denial of service; in privileged processes it may be further exploitable."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "函数返回值未判空；异常路径未清理指针但后续仍使用；可选参数未做默认值处理；语言层面缺乏空安全类型。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Return values not null-checked; error paths clearing pointers while later code still uses them; optional parameters without defaults; language-level lack of null safety."
+      },
+      {
+        "h": "如何发现",
+        "p": "构造资源不存在的请求；模拟内存分配失败；开启 ASan 或崩溃转储分析调用栈。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Trigger requests for nonexistent resources; simulate allocation failure; enable ASan or analyze crash dumps for the call stack."
+      },
+      {
+        "h": "解决办法",
+        "p": "使用 Option/Maybe 等空安全类型强制调用方处理。关键路径返回值必须判空并记录。引入进程级崩溃隔离与自动重启，把单次崩溃的影响限制在单请求。",
+        "code": [
+          {
+            "lang": "c",
+            "title": "不判空",
+            "bad": "ctx = find_context(id);\nctx->value = 1;",
+            "good": "ctx = find_context(id);\nif (ctx == NULL) { log_warn(\"ctx missing id=%d\", id); return -1; }\nctx->value = 1;",
+            "note": "查找失败是正常路径，必须显式处理",
+            "title_en": "No null check",
+            "note_en": "A failed lookup is a normal path and must be handled explicitly"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use null-safe types such as Option or Maybe to force callers to handle absence. Check and log critical lookups. Add per-request crash isolation and automatic restart so one crash has bounded impact."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-476",
+        "url": "https://cwe.mitre.org/data/definitions/476.html"
+      }
+    ],
+    "tags": [
+      "内存",
+      "稳定性"
+    ],
+    "quiz": [
+      {
+        "q": "空指针解引用在服务端的典型后果是？",
+        "options": [
+          "数据泄露",
+          "进程崩溃，可被反复触发形成拒绝服务",
+          "权限提升",
+          "磁盘损坏"
+        ],
+        "answer": 1,
+        "explain": "单次崩溃影响有限，但可被反复触发。",
+        "q_en": "Typical server-side consequence of a null dereference?",
+        "options_en": [
+          "Data leak",
+          "Process crash, repeatable for denial of service",
+          "Privilege escalation",
+          "Disk damage"
+        ],
+        "explain_en": "A single crash is bounded but can be triggered repeatedly."
+      },
+      {
+        "q": "Rust 中用 Option 表示可能不存在的值，好处是？",
+        "options": [
+          "运行更快",
+          "编译器强制调用方处理 None，不会漏判",
+          "减少内存",
+          "支持泛型"
+        ],
+        "answer": 1,
+        "explain": "空安全类型把运行时崩溃转化为编译期强制处理。",
+        "q_en": "Benefit of Rust's Option for possibly-absent values?",
+        "options_en": [
+          "Faster",
+          "The compiler forces handling None, preventing missed checks",
+          "Less memory",
+          "Generics"
+        ],
+        "explain_en": "Null safety turns runtime crashes into compile-time requirements."
+      },
+      {
+        "q": "关键路径返回空值时，正确处理是？",
+        "options": [
+          "直接继续使用",
+          "判空、记录日志并返回明确错误",
+          "忽略",
+          "用默认值顶替"
+        ],
+        "answer": 1,
+        "explain": "静默顶替会掩盖问题，导致后续更难定位。",
+        "q_en": "Correct handling when a critical lookup returns null?",
+        "options_en": [
+          "Continue using it",
+          "Check, log, and return a clear error",
+          "Ignore",
+          "Substitute a default"
+        ],
+        "explain_en": "Silent substitution hides problems and complicates debugging."
+      }
+    ]
+  },
+  {
+    "id": "cwe-94",
+    "kind": "cwe",
+    "category": "注入类",
+    "cwe": "CWE-94",
+    "title": "代码注入",
+    "title_en": "Improper Control of Code Generation",
+    "level": "advanced",
+    "icon": "CODE",
+    "color": "injection",
+    "summary": "程序把外部输入当作代码执行，eval 类接口是最典型的入口，后果通常是完全控制。",
+    "summary_en": "External input is evaluated as code.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "动态求值类接口（eval、exec、Function 构造器、模板引擎的动态编译）会解析字符串并执行。当字符串含用户输入时，输入就获得了编程语言的全部能力。与命令注入不同，代码注入运行在应用进程内，可直接访问内存中的密钥与数据。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Dynamic evaluation APIs (eval, exec, Function constructor, template compilation) parse a string and execute it. When the string contains user input, that input gains the full power of the language. Unlike command injection, code runs inside the application process with direct access to keys and data in memory."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为灵活配置而允许用户提交表达式；模板引擎开启了对用户模板的渲染；把 JSON 字符串交给 eval 解析；插件系统直接执行上传的脚本。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Allowing user-submitted expressions for flexibility; template engines rendering user templates; handing JSON strings to eval; plugin systems executing uploaded scripts."
+      },
+      {
+        "h": "如何发现",
+        "p": "在疑似表达式入口填 1+1、'a'.length 观察是否返回计算结果；填系统命令或文件读取函数观察副作用。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Submit 1+1 or 'a'.length at suspected expression entry points and see whether a computed result returns; submit file or command functions to observe side effects."
+      },
+      {
+        "h": "解决办法",
+        "p": "彻底移除动态求值：用 JSON.parse 代替 eval，用受限模板语法代替自由模板。确需表达式能力时使用沙箱解释器，限制可用函数与资源。插件一律签名校验并运行在独立低权限进程。",
+        "code": [
+          {
+            "lang": "javascript",
+            "title": "eval 解析数据",
+            "bad": "const data = eval(\"(\" + input + \")\");",
+            "good": "const data = JSON.parse(input);",
+            "note": "解析数据永不需要求值",
+            "title_en": "eval for parsing data",
+            "note_en": "Parsing data never requires evaluation"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Remove dynamic evaluation entirely: use JSON.parse instead of eval, restricted template syntax instead of free-form templates. When expressions are genuinely required, use a sandboxed interpreter limiting available functions and resources. Sign plugins and run them in a separate low-privilege process."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-94",
+        "url": "https://cwe.mitre.org/data/definitions/94.html"
+      }
+    ],
+    "tags": [
+      "注入",
+      "RCE"
+    ],
+    "quiz": [
+      {
+        "q": "eval 与 JSON.parse 的根本区别是？",
+        "options": [
+          "速度不同",
+          "eval 把输入当作程序执行，JSON.parse 只解析数据",
+          "体积不同",
+          "浏览器支持不同"
+        ],
+        "answer": 1,
+        "explain": "数据永远不需要被当作程序。",
+        "q_en": "What should be used to parse JSON data?",
+        "options_en": [
+          "eval",
+          "JSON.parse",
+          "new Function",
+          "setTimeout with a string"
+        ],
+        "explain_en": "Parsing data never requires evaluation."
+      },
+      {
+        "q": "允许用户提交模板并在服务端渲染，属于哪类风险？",
+        "options": [
+          "信息泄露",
+          "代码注入（模板注入）",
+          "拒绝服务",
+          "越权"
+        ],
+        "answer": 1,
+        "explain": "模板表达式是代码，用户可控即为代码注入。",
+        "q_en": "Letting users submit templates rendered server-side risks?",
+        "options_en": [
+          "Slower rendering",
+          "Code injection through template expressions",
+          "Style breakage",
+          "No caching"
+        ],
+        "explain_en": "Template syntax is code; user control means code injection."
+      },
+      {
+        "q": "插件系统执行上传的脚本前，至少应该做什么？",
+        "options": [
+          "检查文件大小",
+          "签名校验并运行在独立低权限进程中",
+          "改名",
+          "压缩"
+        ],
+        "answer": 1,
+        "explain": "插件是天然的高危入口，必须隔离与验证。",
+        "q_en": "If expression capability is required, the safest option is?",
+        "options_en": [
+          "eval with keyword filtering",
+          "A sandboxed interpreter limiting available functions and resources",
+          "Enable only at night",
+          "Limit expression length"
+        ],
+        "explain_en": "Sandboxing bounds capability; keyword filtering always leaks."
+      }
+    ]
+  },
+  {
+    "id": "cwe-200",
+    "kind": "cwe",
+    "category": "信息暴露",
+    "cwe": "CWE-200",
+    "title": "敏感信息暴露",
+    "title_en": "Exposure of Sensitive Information",
+    "level": "beginner",
+    "icon": "LEAK",
+    "color": "leak",
+    "summary": "系统在响应、日志或错误页里泄露了不该给攻击者看的信息，为后续攻击提供地图。",
+    "summary_en": "Sensitive information leaks through responses, logs, or error pages.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "信息本身可能不直接造成损害，但它降低攻击成本：堆栈信息暴露框架版本与文件路径，调试接口暴露内部拓扑，详细的认证失败提示区分「用户不存在」与「密码错误」，为撞库提供有效判定。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The information itself may not cause direct damage, but it lowers attack cost: stack traces expose framework versions and file paths, debug endpoints expose internal topology, detailed auth failure messages distinguish unknown-user from wrong-password and enable credential stuffing."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "生产环境开启调试模式；异常未统一处理直接回显堆栈；接口返回了完整对象而非必要字段；日志中包含身份证号、手机号、令牌；备份文件、.git 目录未禁止访问。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Debug mode enabled in production; exceptions uncaught and echoed with stacks; endpoints returning full objects instead of needed fields; logs containing ID numbers, phone numbers, or tokens; backup files and .git directories left accessible."
+      },
+      {
+        "h": "如何发现",
+        "p": "触发各类异常观察响应体；检查响应头是否泄露服务器版本；访问 /.git/config、/backup.zip、/.env、/swagger-ui；对比不同账号响应的字段差异。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Trigger various exceptions and inspect response bodies; check headers for server versions; request /.git/config, /backup.zip, /.env, /swagger-ui; diff response fields across accounts."
+      },
+      {
+        "h": "解决办法",
+        "p": "统一异常处理，对外只返回错误码与追踪 ID，细节写内部日志。接口采用显式字段投影（DTO），不直接序列化实体。日志脱敏。生产环境关闭调试与文档页面，或加访问控制。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "回显堆栈",
+            "bad": "catch (Exception e) {\n    response.getWriter().write(e.toString());\n}",
+            "good": "catch (Exception e) {\n    String traceId = UUID.randomUUID().toString();\n    log.error(\"trace={}\", traceId, e);\n    // Return only an error code and trace id; keep details in internal logs\n    String body = String.format(\n        \"{\\\"code\\\":\\\"E500\\\",\\\"traceId\\\":\\\"%s\\\"}\", traceId);\n    response.getWriter().write(body);\n}",
+            "note": "细节只进日志，响应只给追踪号（片段依赖 HttpServletResponse 与 slf4j）",
+            "title_en": "Stack trace reflected",
+            "note_en": "Details go to logs; the response carries only a trace id (excerpt depends on HttpServletResponse and slf4j)"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Centralize exception handling so clients receive only an error code and trace id, with details in internal logs. Project explicit DTOs instead of serializing entities. Redact logs. Disable debug and documentation pages in production, or protect them with access control."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-200",
+        "url": "https://cwe.mitre.org/data/definitions/200.html"
+      }
+    ],
+    "tags": [
+      "信息泄露",
+      "配置"
+    ],
+    "quiz": [
+      {
+        "q": "下面哪项最不属于\"必要字段\"？",
+        "options": [
+          "用户名",
+          "订单金额",
+          "用户密码哈希",
+          "下单时间"
+        ],
+        "answer": 2,
+        "explain": "密码哈希任何情况下都不应出现在响应中。",
+        "q_en": "Which field is never required in a response?",
+        "options_en": [
+          "Username",
+          "Order amount",
+          "Password hash",
+          "Created time"
+        ],
+        "explain_en": "Password hashes must never appear in any response."
+      },
+      {
+        "q": "日志中记录完整身份证号的问题在于？",
+        "options": [
+          "日志太大",
+          "日志的访问控制通常弱于业务数据，扩大泄露面",
+          "影响性能",
+          "无法检索"
+        ],
+        "answer": 1,
+        "explain": "日志脱敏是合规的基本要求。",
+        "q_en": "Why is logging full ID numbers a problem?",
+        "options_en": [
+          "Logs get large",
+          "Log access control is weaker than business data, widening exposure",
+          "Performance",
+          "Hard to search"
+        ],
+        "explain_en": "Log redaction is a baseline compliance requirement."
+      },
+      {
+        "q": "/.git/config 可被公网访问，风险是？",
+        "options": [
+          "占用带宽",
+          "可被还原源码，泄露密钥与内部结构",
+          "影响 SEO",
+          "没有风险"
+        ],
+        "answer": 1,
+        "explain": "源码泄露往往直接导致密钥泄露与漏洞定位。",
+        "q_en": "Risk of exposing /.git/config publicly?",
+        "options_en": [
+          "Bandwidth",
+          "Source code can be reconstructed, leaking keys and internals",
+          "SEO impact",
+          "No risk"
+        ],
+        "explain_en": "Source leaks typically lead directly to key exposure and flaw discovery."
+      }
+    ]
+  },
+  {
+    "id": "cwe-269",
+    "kind": "cwe",
+    "category": "访问控制",
+    "cwe": "CWE-269",
+    "title": "权限管理不当",
+    "title_en": "Improper Privilege Management",
+    "level": "intermediate",
+    "icon": "PRIV",
+    "color": "access",
+    "summary": "账号被授予了超出职责的权限，一旦被攻破，攻击者可直接获得高权限立足点。",
+    "summary_en": "Accounts hold more privileges than their duties require.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "最小权限原则要求每个主体只拥有完成任务所必需的最小权限。实践中常见的偏离：服务以 root 运行、数据库账号拥有 DDL 权限、运维账号长期持有生产写权限、离职员工账号未及时回收。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The principle of least privilege says every principal should hold only the minimum rights needed for its duties. Common deviations: services running as root, database accounts with DDL rights, operators holding standing production write access, departed employees' accounts never reclaimed."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为省事统一用高权限账号；容器默认以 root 启动；权限申请流程缺失或形同虚设；历史遗留账号无人清理。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Using one high-privilege account for convenience; containers starting as root; missing or nominal access request processes; legacy accounts nobody cleans up."
+      },
+      {
+        "h": "如何发现",
+        "p": "盘点所有账号及其权限，识别长期未使用的高权限账号；检查服务进程的运行身份；检查数据库账号的授权范围；检查云上角色的策略是否含通配符。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Inventory all accounts and permissions and identify long-unused high-privilege ones; check the identity of service processes; review database grants; check whether cloud role policies contain wildcards."
+      },
+      {
+        "h": "解决办法",
+        "p": "服务以专用的低权限账号运行，容器配置非 root 用户。数据库按业务分离账号，读写分离最小化授权。高权限操作走审批与临时提权，事后自动回收。建立账号生命周期管理，定期复核。",
+        "code": [
+          {
+            "lang": "text",
+            "title": "root 运行",
+            "bad": "USER root\nCMD [\"./app\"]",
+            "good": "RUN useradd -r -u 10001 appuser\nUSER appuser\nCMD [\"./app\"]",
+            "note": "容器内非 root，泄露后影响范围受限",
+            "title_en": "Running as root",
+            "note_en": "Non-root inside the container limits the blast radius of a leak"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Run services under dedicated low-privilege accounts and configure non-root users in containers. Separate database accounts by purpose and minimize grants. Require approval and time-boxed elevation for privileged operations, revoke automatically afterward. Manage account lifecycle and review regularly."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-269",
+        "url": "https://cwe.mitre.org/data/definitions/269.html"
+      },
+      {
+        "name": "NIST SP 800-53 AC-6",
+        "url": "https://csrc.nist.gov/projects/cprt/catalog#/cprt/framework/version/SP_800_53_5_1_1/home"
+      }
+    ],
+    "tags": [
+      "权限",
+      "运维"
+    ],
+    "quiz": [
+      {
+        "q": "最小权限原则要求？",
+        "options": [
+          "所有服务统一用管理员账号",
+          "每个主体只拥有完成任务所必需的最小权限",
+          "权限越多越省事",
+          "由用户自行申请"
+        ],
+        "answer": 1,
+        "explain": "权限越小，被攻破后的影响范围越小。",
+        "q_en": "What does least privilege require?",
+        "options_en": [
+          "All services share an admin account",
+          "Each principal holds only the minimum rights for its duties",
+          "More privileges are more convenient",
+          "Users request their own rights"
+        ],
+        "explain_en": "Smaller privilege means a smaller blast radius when compromised."
+      },
+      {
+        "q": "数据库业务账号应该拥有 DDL 权限吗？",
+        "options": [
+          "应该，方便开发",
+          "不应该，DDL 应由迁移账号单独执行",
+          "取决于数据量",
+          "取决于数据库类型"
+        ],
+        "answer": 1,
+        "explain": "业务账号越权会放大注入等缺陷的危害。",
+        "q_en": "Should the business DB account hold DDL privileges?",
+        "options_en": [
+          "Yes, for developer convenience",
+          "No; migrations should run under a dedicated migration account",
+          "Depends on data volume",
+          "Depends on database type"
+        ],
+        "explain_en": "Over-privileged business accounts amplify the impact of flaws like injection."
+      },
+      {
+        "q": "离职员工账号未及时回收，属于哪类问题？",
+        "options": [
+          "认证缺陷",
+          "权限管理不当",
+          "加密缺陷",
+          "输入校验"
+        ],
+        "answer": 1,
+        "explain": "账号生命周期管理是权限治理的必要环节。",
+        "q_en": "A departed employee's account was never reclaimed. What class is this?",
+        "options_en": [
+          "Authentication flaw",
+          "Improper privilege management",
+          "Cryptography flaw",
+          "Input validation"
+        ],
+        "explain_en": "Account lifecycle management is essential to privilege governance."
+      }
+    ]
+  },
+  {
+    "id": "cwe-843",
+    "kind": "cwe",
+    "category": "类型系统",
+    "cwe": "CWE-843",
+    "title": "类型混淆",
+    "title_en": "Type Confusion",
+    "level": "advanced",
+    "icon": "TYPE",
+    "color": "memory",
+    "summary": "程序把一块内存当作错误的类型来解释，导致字段偏移错位，进而可读写任意内存。",
+    "summary_en": "Memory is interpreted as the wrong type, misaligning fields.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "不同对象在内存中的布局不同。若程序在未校验实际类型的情况下按某个类型的布局去访问字段，读到的就是错位的数据。攻击者可以构造一个「看起来是 A 类型、实际是 B 类型」的对象，让程序把可控的值当作指针或函数地址使用。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Different objects have different memory layouts. If the program accesses fields using one type's layout without verifying the actual type, it reads misaligned data. An attacker can craft an object that looks like type A but is type B, making a controlled value be used as a pointer or function address."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "手动使用类型转换（reinterpret_cast、unsafe 的 transmute）；继承体系下缺少运行时类型检查；JSON 反序列化到基类后直接强转子类；JIT 引擎的类型推断被优化破坏。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Manual casts (reinterpret_cast, transmute in unsafe Rust); missing runtime type checks in inheritance hierarchies; deserializing into a base class then force-casting; JIT type inference broken by optimization."
+      },
+      {
+        "h": "如何发现",
+        "p": "向接受多态对象的接口灌入不同结构的输入；fuzzing 关注崩溃样本中的类型不匹配；审查所有强制类型转换点。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Feed structurally different inputs to interfaces accepting polymorphic objects; fuzz and inspect crash samples for type mismatches; audit every forced cast."
+      },
+      {
+        "h": "解决办法",
+        "p": "使用语言提供的安全类型转换（dynamic_cast、模式匹配），转换失败显式处理。避免 unsafe 的裸指针转换，必要处加运行时断言。序列化时携带显式类型标识并做白名单校验。",
+        "code": [
+          {
+            "lang": "cpp",
+            "title": "reinterpret_cast",
+            "bad": "Base* b = get();\nDerived* d = reinterpret_cast<Derived*>(b);\nd->run();",
+            "good": "Base* b = get();\nDerived* d = dynamic_cast<Derived*>(b);\nif (!d) return ERR_TYPE;\nd->run();",
+            "note": "运行时检查类型，转换失败显式返回",
+            "title_en": "reinterpret_cast",
+            "note_en": "Check the type at runtime and return explicitly on failure"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use language-provided safe casts (dynamic_cast, pattern matching) and handle failure explicitly. Avoid unsafe raw-pointer casting; add runtime assertions where necessary. Carry explicit type tags during serialization and whitelist them."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-843",
+        "url": "https://cwe.mitre.org/data/definitions/843.html"
+      }
+    ],
+    "tags": [
+      "内存",
+      "类型"
+    ],
+    "quiz": [
+      {
+        "q": "类型混淆的危险在于？",
+        "options": [
+          "代码难读",
+          "误按错误布局解释内存，可读写任意地址",
+          "编译变慢",
+          "不支持泛型"
+        ],
+        "answer": 1,
+        "explain": "字段偏移错位后，可控值可能被当作指针使用。",
+        "q_en": "Why is type confusion dangerous?",
+        "options_en": [
+          "Hard to read",
+          "Interpreting memory with the wrong layout enables arbitrary access",
+          "Slower compile",
+          "No generics"
+        ],
+        "explain_en": "Misaligned fields can turn controlled values into pointers."
+      },
+      {
+        "q": "C++ 中安全的多态向下转换应使用？",
+        "options": [
+          "reinterpret_cast",
+          "dynamic_cast 并检查返回值",
+          "static_cast 无需检查",
+          "C 风格强转"
+        ],
+        "answer": 1,
+        "explain": "dynamic_cast 会做运行时类型检查，失败返回空指针。",
+        "q_en": "Safe downcast for polymorphic C++ objects?",
+        "options_en": [
+          "reinterpret_cast",
+          "dynamic_cast with a null check",
+          "static_cast without check",
+          "C-style cast"
+        ],
+        "explain_en": "dynamic_cast performs a runtime type check and returns null on failure."
+      },
+      {
+        "q": "反序列化时应如何处理类型信息？",
+        "options": [
+          "信任数据中的类型字段",
+          "携带显式类型标识并做白名单校验",
+          "忽略类型字段",
+          "用字符串长度判断"
+        ],
+        "answer": 1,
+        "explain": "不校验类型就给了攻击者选择类的自由。",
+        "q_en": "How should type info be handled in deserialization?",
+        "options_en": [
+          "Trust the type field in data",
+          "Carry an explicit type tag and validate against a whitelist",
+          "Ignore the field",
+          "Use string length"
+        ],
+        "explain_en": "Without validation, attackers choose which class to instantiate."
+      }
+    ]
+  },
+  {
+    "id": "cwe-400",
+    "kind": "cwe",
+    "category": "资源管理",
+    "cwe": "CWE-400",
+    "title": "资源耗尽型拒绝服务",
+    "title_en": "Uncontrolled Resource Consumption",
+    "level": "beginner",
+    "icon": "DOS",
+    "color": "dos",
+    "summary": "攻击者用少量请求消耗掉大量内存、CPU 或连接数，使正常用户无法使用服务。",
+    "summary_en": "Small requests consume disproportionate memory, CPU, or connections.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "系统对单个请求可以消耗的资源没有上限，而攻击者可以并发发起大量请求。典型形态：请求超大文件上传、触发正则灾难性回溯（ReDoS）、构造深层嵌套 JSON 导致递归爆栈、提交大量慢查询、打开连接不关闭。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The system has no per-request resource cap while attackers can issue many concurrent requests. Typical forms: oversized uploads, catastrophic regex backtracking (ReDoS), deep JSON nesting causing stack exhaustion, mass slow queries, connections left open."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "缺少请求体大小限制；使用易产生回溯的正则表达式；递归解析未限制深度；无速率限制；压缩算法存在不对称性（压缩炸弹）。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Missing request body limits; regexes prone to backtracking; recursive parsers without depth limits; no rate limiting; asymmetric compression (zip bombs)."
+      },
+      {
+        "h": "如何发现",
+        "p": "提交超长字符串与深层嵌套结构；对使用正则的输入构造形如 aaaa...X 的回溯触发串；测量资源占用随输入规模的增长曲线。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Submit very long strings and deeply nested structures; craft backtracking inputs like aaaa...X against regex-using fields; measure resource usage growth versus input size."
+      },
+      {
+        "h": "解决办法",
+        "p": "设定请求体大小、解析深度、执行时间、并发数上限。正则改为无回溯实现或设置超时。压缩前校验解压后大小。接入速率限制与连接数限制。关键路径加超时与熔断。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "无上限解析",
+            "bad": "data = json.loads(request.body)",
+            "good": "if len(request.body) > 1_048_576:\n    raise PayloadTooLarge\ndata = json.loads(request.body, parse_constant=reject)",
+            "note": "请求体大小与解析深度都要设上限",
+            "title_en": "Unbounded parsing",
+            "note_en": "Cap both body size and parse depth"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Set limits on body size, parse depth, execution time, and concurrency. Replace backtracking regex with linear-time implementations or add timeouts. Validate decompressed size before extraction. Add rate limiting and connection caps. Apply timeouts and circuit breakers on critical paths."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-400",
+        "url": "https://cwe.mitre.org/data/definitions/400.html"
+      }
+    ],
+    "tags": [
+      "可用性",
+      "DoS"
+    ],
+    "quiz": [
+      {
+        "q": "压缩炸弹（zip bomb）利用的是？",
+        "options": [
+          "网络带宽",
+          "压缩比不对称：极小文件解压后极大",
+          "CPU 指令集",
+          "磁盘 IO"
+        ],
+        "answer": 1,
+        "explain": "必须在解压前校验声明的解压后大小。",
+        "q_en": "What does a zip bomb exploit?",
+        "options_en": [
+          "Bandwidth",
+          "Asymmetric compression: tiny archive expanding hugely",
+          "CPU instruction set",
+          "Disk IO"
+        ],
+        "explain_en": "Validate declared decompressed size before extraction."
+      },
+      {
+        "q": "防资源耗尽的关键措施不包括？",
+        "options": [
+          "请求体大小上限",
+          "解析深度上限",
+          "执行超时",
+          "增加日志级别"
+        ],
+        "answer": 3,
+        "explain": "日志级别与资源上限无关。",
+        "q_en": "Which is NOT a resource exhaustion control?",
+        "options_en": [
+          "Request body size limit",
+          "Parse depth limit",
+          "Execution timeout",
+          "Increasing log verbosity"
+        ],
+        "explain_en": "Log verbosity is unrelated to resource bounds."
+      },
+      {
+        "q": "正则匹配可能造成资源耗尽时，应该？",
+        "options": [
+          "增加重试",
+          "设置执行超时并改写为线性时间写法",
+          "降低并发",
+          "改用多线程"
+        ],
+        "answer": 1,
+        "explain": "超时是兜底，改写才是根治。",
+        "q_en": "If regex matching can exhaust resources, you should?",
+        "options_en": [
+          "Add retries",
+          "Set an execution timeout and rewrite to linear time",
+          "Reduce concurrency",
+          "Add threads"
+        ],
+        "explain_en": "Timeout is a guard; rewriting is the cure."
+      }
+    ]
+  },
+  {
+    "id": "cwe-1321",
+    "kind": "cwe",
+    "category": "语言特性",
+    "cwe": "CWE-1321",
+    "title": "原型污染",
+    "title_en": "Prototype Pollution",
+    "level": "intermediate",
+    "icon": "PROTO",
+    "color": "lang",
+    "summary": "JavaScript 中通过 __proto__ 等键污染对象原型，使所有对象继承到攻击者可控属性。",
+    "summary_en": "Polluting Object.prototype via __proto__ affects every object.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "JavaScript 的对象继承自 Object.prototype。若程序对用户输入的键值做递归合并而不过滤 __proto__、constructor、prototype 这类键，攻击者就能写入原型链，污染后续所有对象的属性查找结果，进而影响鉴权判断、模板渲染、子进程参数等。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "JavaScript objects inherit from Object.prototype. If code recursively merges user key-value pairs without filtering __proto__, constructor, or prototype, an attacker can write into the prototype chain and influence property lookups for every subsequent object, affecting authorization decisions, template rendering, or child process arguments."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "使用不安全的深度合并（如早期版本的 lodash.merge）；从查询串或 JSON 反序列化后直接合并到配置对象；第三方库内部存在合并逻辑；参数解析库对嵌套键做展开。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Unsafe deep-merge helpers (early lodash.merge); merging query strings or deserialized JSON straight into config objects; third-party libraries with internal merge logic; parameter parsers expanding nested keys."
+      },
+      {
+        "h": "如何发现",
+        "p": "提交 {\"__proto__\":{\"polluted\":\"yes\"}} 后检查普通对象 {} .polluted 的值；测试 a[__proto__][x]=y 形式的查询串；扫描依赖树中已知受影响的库版本。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Submit {\"__proto__\":{\"polluted\":\"yes\"}} and then check {}.polluted; test a[__proto__][x]=y query strings; scan the dependency tree for affected versions."
+      },
+      {
+        "h": "解决办法",
+        "p": "合并前过滤危险键名，或使用 Object.create(null) 创建无原型对象。校验输入为纯 JSON 且键名白名单。使用 Object.freeze(Object.prototype) 加固。升级受影响依赖。",
+        "code": [
+          {
+            "lang": "javascript",
+            "title": "不安全的合并",
+            "bad": "function merge(t, s) {\n  for (const k in s) {\n    if (typeof s[k] === \"object\") merge(t[k] = t[k] || {}, s[k]);\n    else t[k] = s[k];\n  }\n}",
+            "good": "function safeMerge(t, s) {\n  for (const k of Object.keys(s)) {\n    if (k === \"__proto__\" || k === \"constructor\" || k === \"prototype\") continue;\n    if (s[k] && typeof s[k] === \"object\") safeMerge(t[k] = t[k] || {}, s[k]);\n    else t[k] = s[k];\n  }\n}",
+            "note": "只遍历自有的可枚举键，并显式跳过危险键名",
+            "title_en": "Unsafe merge",
+            "note_en": "Iterate only own enumerable keys and skip dangerous names explicitly"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Filter dangerous key names before merging, or create prototype-less objects with Object.create(null). Validate input as plain JSON with a key whitelist. Harden with Object.freeze(Object.prototype). Upgrade affected dependencies."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-1321",
+        "url": "https://cwe.mitre.org/data/definitions/1321.html"
+      }
+    ],
+    "tags": [
+      "JavaScript",
+      "前端"
+    ],
+    "quiz": [
+      {
+        "q": "原型污染通过哪个键名实现？",
+        "options": [
+          "name",
+          "__proto__",
+          "id",
+          "type"
+        ],
+        "answer": 1,
+        "explain": "写入 __proto__ 会污染 Object.prototype，影响所有对象。",
+        "q_en": "Which key enables prototype pollution?",
+        "options_en": [
+          "name",
+          "__proto__",
+          "id",
+          "type"
+        ],
+        "explain_en": "Writing __proto__ pollutes Object.prototype for every object."
+      },
+      {
+        "q": "防御原型污染的有效做法是？",
+        "options": [
+          "只过滤 __proto__",
+          "过滤危险键并使用无原型对象",
+          "转成字符串",
+          "限制大小"
+        ],
+        "answer": 1,
+        "explain": "需同时处理 constructor 与 prototype，并用 Object.create(null) 兜底。",
+        "q_en": "Effective defense against prototype pollution?",
+        "options_en": [
+          "Filter only __proto__",
+          "Filter dangerous keys and use prototype-less objects",
+          "Convert to string",
+          "Limit size"
+        ],
+        "explain_en": "Handle constructor and prototype too, and use Object.create(null)."
+      },
+      {
+        "q": "第三方深度合并库为何是风险点？",
+        "options": [
+          "体积大",
+          "内部可能递归合并用户可控键",
+          "不支持 TS",
+          "性能差"
+        ],
+        "answer": 1,
+        "explain": "库的合并逻辑若不过滤危险键，会把污染带进来。",
+        "q_en": "Why are third-party deep-merge libraries risky?",
+        "options_en": [
+          "Bundle size",
+          "They may recursively merge user-controlled keys",
+          "No TypeScript support",
+          "Slow"
+        ],
+        "explain_en": "Unfiltered merge logic carries the pollution in."
+      }
+    ]
+  },
+  {
+    "id": "cwe-307",
+    "kind": "cwe",
+    "category": "认证与会话",
+    "cwe": "CWE-307",
+    "title": "缺少登录频率限制",
+    "title_en": "Improper Restriction of Excessive Authentication Attempts",
+    "level": "beginner",
+    "icon": "BRUTE",
+    "color": "auth",
+    "summary": "登录接口不限尝试次数，攻击者可对账号做暴力破解或对大量账号做撞库。",
+    "summary_en": "Unlimited authentication attempts enable brute force and credential stuffing.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "密码空间虽大，但真实用户的密码分布集中。攻击者用泄露的账号密码库做撞库，命中率可达千分之几。没有频率限制时，自动化工具可以每小时尝试数万次而不被察觉。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Though the password space is large, real user passwords cluster. Attackers use leaked credential databases for stuffing with hit rates in the per-mille range. Without rate limits, automated tools try tens of thousands of times per hour unnoticed."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "只在前端做了按钮禁用；限制基于 IP，而攻击者用代理池；限制基于账号，攻击者改为对多账号低频率尝试（低速撞库）；错误提示区分用户是否存在，加速账号枚举。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Only disabling the button in the frontend; limiting by IP while attackers rotate proxies; limiting per account while attackers switch to low-and-slow across many accounts; distinct error messages speeding up account enumeration."
+      },
+      {
+        "h": "如何发现",
+        "p": "对同一账号连续提交错误密码，观察是否出现锁定或延迟；对大量不同账号各尝试一次，观察是否被识别；检查响应时间是否随失败次数增加。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Submit wrong passwords repeatedly for one account and watch for lockout or delay; try many different accounts once each and see whether it is detected; check whether response timing changes with failure count."
+      },
+      {
+        "h": "解决办法",
+        "p": "组合多种维度限流：账号维度、IP 维度、设备指纹维度，并对全局失败率设阈值。失败响应统一化为「用户名或密码错误」。引入验证码作为递增式挑战。对高频失败触发告警与人工介入。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "不限次数",
+            "bad": "if user.password == password:\n    return login(user)",
+            "good": "key = f\"fail:{user.id}\"\nn = redis.incr(key)\nif n == 1: redis.expire(key, 900)\nif n > 5: raise TooManyAttempts\nif user.password == password:\n    redis.delete(key)\n    return login(user)",
+            "note": "按账号维度计数并设窗口，成功后清零",
+            "title_en": "No attempt limit",
+            "note_en": "Count per account with a window and reset on success"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Combine dimensions: per account, per IP, and per device fingerprint, plus a global failure-rate threshold. Normalize failure responses to username or password incorrect. Introduce incremental CAPTCHA challenges. Alert on high failure rates for human review."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-307",
+        "url": "https://cwe.mitre.org/data/definitions/307.html"
+      }
+    ],
+    "tags": [
+      "认证",
+      "暴力破解"
+    ],
+    "quiz": [
+      {
+        "q": "只按 IP 限流的局限是？",
+        "options": [
+          "实现复杂",
+          "攻击者可用代理池轮换 IP",
+          "影响正常用户",
+          "浏览器不支持"
+        ],
+        "answer": 1,
+        "explain": "必须组合账号维度与设备维度。",
+        "q_en": "Limitation of IP-only rate limiting?",
+        "options_en": [
+          "Complex to build",
+          "Attackers rotate through proxy pools",
+          "Hurts normal users",
+          "Browsers lack support"
+        ],
+        "explain_en": "Account and device dimensions are required."
+      },
+      {
+        "q": "低速撞库指的是？",
+        "options": [
+          "慢速网络攻击",
+          "对大量账号各少量尝试，规避单账号限流",
+          "只打慢接口",
+          "降低并发"
+        ],
+        "answer": 1,
+        "explain": "需要基于全局失败率与异常分布识别。",
+        "q_en": "What is low-and-slow credential stuffing?",
+        "options_en": [
+          "Slow network attack",
+          "Trying a few times across many accounts to evade per-account limits",
+          "Attacking slow endpoints",
+          "Lower concurrency"
+        ],
+        "explain_en": "Detection needs global failure rate and anomaly distribution."
+      },
+      {
+        "q": "失败达阈值后合适的处理是？",
+        "options": [
+          "永久封号",
+          "递增式验证码或临时锁定并告警",
+          "忽略",
+          "返回详细原因"
+        ],
+        "answer": 1,
+        "explain": "兼顾阻断自动化与避免误伤。",
+        "q_en": "Proper handling once the failure threshold is reached?",
+        "options_en": [
+          "Permanent ban",
+          "Incremental CAPTCHA or temporary lock plus alerting",
+          "Ignore",
+          "Return detailed reasons"
+        ],
+        "explain_en": "Blocks automation without harming legitimate users."
+      }
+    ]
+  },
+  {
+    "id": "cwe-295",
+    "kind": "cwe",
+    "category": "密码学",
+    "cwe": "CWE-295",
+    "title": "证书校验不当",
+    "title_en": "Improper Certificate Validation",
+    "level": "intermediate",
+    "icon": "TLS",
+    "color": "crypto",
+    "summary": "客户端不校验服务端证书，或允许任意证书，使中间人可解密与篡改全部通信。",
+    "summary_en": "Skipping certificate validation enables man-in-the-middle attacks.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "TLS 的机密性建立在「确认对端身份」之上。如果客户端接受任何证书（禁用校验、信任所有主机名、忽略过期），攻击者在链路上放一个自签证书即可完整解密流量，TLS 退化为加密但可被解密的通道。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "TLS confidentiality rests on verifying the peer's identity. If the client accepts any certificate (validation disabled, hostname check skipped, expiry ignored), an attacker can place a self-signed certificate on the path and fully decrypt traffic. TLS degrades to an encrypted-but-decryptable channel."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "自签证书测试环境联调后忘记改回；为绕过证书过期报错而直接关闭校验；自定义 HTTP 客户端时自定义了信任管理器；证书固定（pinning）实现错误，导致回退到不校验。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Self-signed certs used during testing and never reverted; disabling validation to get past expiry errors; custom trust managers in custom HTTP clients; incorrect certificate pinning leading to a fallback that skips validation."
+      },
+      {
+        "h": "如何发现",
+        "p": "在代理工具中开启中间人模式，观察客户端是否接受伪造证书；代码审查搜索 trustAll、InsecureSkipVerify、verify=False、setHostnameVerifier。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Enable MITM mode in a proxy and check whether the client accepts the forged certificate; grep for trustAll, InsecureSkipVerify, verify=False, and setHostnameVerifier."
+      },
+      {
+        "h": "解决办法",
+        "p": "使用平台默认的信任库，不自定义信任策略。如需固定证书，实现中必须包含失败即拒绝的分支。开发期用本地 CA 并导入信任库，而不是关闭校验。把证书校验失败作为需要修复的缺陷而非可跳过的问题。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "关闭校验",
+            "bad": "requests.get(url, verify=False)",
+            "good": "requests.get(url)   # verifies by default; for self-signed use verify=\"/path/ca.pem\"",
+            "note": "自定义 CA 而不是关闭校验",
+            "title_en": "Verification disabled",
+            "note_en": "Use a custom CA instead of disabling verification"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use the platform default trust store without custom trust policies. If pinning is needed, the implementation must include a fail-closed branch. For development, import a local CA rather than disabling validation. Treat validation failures as defects, not something to skip."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-295",
+        "url": "https://cwe.mitre.org/data/definitions/295.html"
+      }
+    ],
+    "tags": [
+      "TLS",
+      "密码学"
+    ],
+    "quiz": [
+      {
+        "q": "verify=False 这类写法的后果是？",
+        "options": [
+          "请求变慢",
+          "接受任意证书，TLS 退化为可被中间人解密",
+          "无法访问 HTTPS",
+          "证书会过期"
+        ],
+        "answer": 1,
+        "explain": "证书校验是 TLS 身份保证的基础，不能关。",
+        "q_en": "Consequence of verify=False style settings?",
+        "options_en": [
+          "Slower requests",
+          "Accepts any certificate, making TLS decryptable by a MITM",
+          "Breaks HTTPS",
+          "Certificates expire"
+        ],
+        "explain_en": "Certificate validation is the basis of TLS identity."
+      },
+      {
+        "q": "开发环境使用自签证书时，正确做法是？",
+        "options": [
+          "关闭校验",
+          "把自签 CA 导入信任库，或用 verify 指定 CA 文件",
+          "改用 HTTP",
+          "延长超时"
+        ],
+        "answer": 1,
+        "explain": "保留校验能力，只是替换信任源。",
+        "q_en": "Correct approach for self-signed certs in dev?",
+        "options_en": [
+          "Disable validation",
+          "Import the self-signed CA or point verify at a CA file",
+          "Use HTTP",
+          "Extend timeouts"
+        ],
+        "explain_en": "Keep validation, only change the trust source."
+      },
+      {
+        "q": "实现证书固定（pinning）时最关键的是？",
+        "options": [
+          "固定得越严越好",
+          "失败分支必须拒绝连接，不能降级",
+          "只在移动端使用",
+          "只固定域名"
+        ],
+        "answer": 1,
+        "explain": "固定实现里若存在\"失败就跳过\"的分支，等于没有固定。",
+        "q_en": "Most critical aspect of implementing certificate pinning?",
+        "options_en": [
+          "Pin as strictly as possible",
+          "The failure branch must reject, never downgrade",
+          "Mobile only",
+          "Pin the domain only"
+        ],
+        "explain_en": "A skip-on-failure branch means there is no pinning at all."
+      }
+    ]
+  },
+  {
+    "id": "cwe-330",
+    "kind": "cwe",
+    "category": "密码学",
+    "cwe": "CWE-330",
+    "title": "使用不充分的随机性",
+    "title_en": "Use of Insufficiently Random Values",
+    "level": "intermediate",
+    "icon": "RAND",
+    "color": "crypto",
+    "summary": "用可预测的伪随机数生成令牌、密钥或会话 ID，攻击者可推算后续值。",
+    "summary_en": "Predictable random values compromise tokens and session identifiers.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "普通 PRNG（如 rand()、Math.random）以种子确定性地产生序列，不具密码学安全性。若用它生成会话 ID、密码重置令牌、加密密钥，攻击者观察到少量输出后即可推算种子与后续序列，从而伪造令牌。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Ordinary PRNGs (rand(), Math.random) produce a deterministic sequence from a seed and are not cryptographically secure. Using them for session IDs, reset tokens, or keys lets an attacker who observes a few outputs predict the rest and forge tokens."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "语言默认的随机函数看起来够用；种子取自时间戳，可暴力枚举；用递增计数器拼接随机数；密码学库使用方式错误，把密钥当作普通字符串处理。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "The language default looks good enough; the seed comes from a timestamp and can be brute-forced; an incrementing counter is concatenated with a random number; crypto libraries used incorrectly, treating keys as ordinary strings."
+      },
+      {
+        "h": "如何发现",
+        "p": "收集大量生成的令牌，检查是否呈现规律（长度变化、递增、时间相关）；检查代码中随机源的使用（Math.random、rand、Random 无参构造）。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Collect many generated tokens and look for patterns (length variation, increments, time correlation); inspect random source usage in code (Math.random, rand, parameterless Random)."
+      },
+      {
+        "h": "解决办法",
+        "p": "使用密码学安全随机源：CSPRNG（getrandom、secrets、crypto.randomBytes、OsRng）。令牌长度不低于 128 位熵。密钥由密钥管理服务生成，不手工拼接。",
+        "code": [
+          {
+            "lang": "javascript",
+            "title": "Math.random",
+            "bad": "const token = Math.random().toString(36).slice(2);",
+            "good": "const token = crypto.randomBytes(32).toString(\"hex\");",
+            "note": "密码学安全随机源，长度不低于 128 位熵",
+            "title_en": "Math.random",
+            "note_en": "A cryptographically secure source with at least 128 bits of entropy"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use a cryptographically secure source: CSPRNG (getrandom, secrets, crypto.randomBytes, OsRng). Give tokens at least 128 bits of entropy. Generate keys with a key management service rather than assembling them by hand."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-330",
+        "url": "https://cwe.mitre.org/data/definitions/330.html"
+      }
+    ],
+    "tags": [
+      "密码学",
+      "随机数"
+    ],
+    "quiz": [
+      {
+        "q": "Math.random 为何不能生成令牌？",
+        "options": [
+          "速度慢",
+          "不具密码学安全性，输出可被推算",
+          "浏览器不支持",
+          "长度不够"
+        ],
+        "answer": 1,
+        "explain": "普通 PRNG 由种子决定序列。",
+        "q_en": "Why can't Math.random generate tokens?",
+        "options_en": [
+          "Too slow",
+          "It is not cryptographically secure; output is predictable",
+          "Browser limits",
+          "Too short"
+        ],
+        "explain_en": "A seeded PRNG lets observers predict subsequent values."
+      },
+      {
+        "q": "会话令牌建议熵下限？",
+        "options": [
+          "32 位",
+          "64 位",
+          "128 位",
+          "8 位"
+        ],
+        "answer": 2,
+        "explain": "128 位是业界普遍接受的下限。",
+        "q_en": "Recommended minimum entropy for session tokens?",
+        "options_en": [
+          "32 bits",
+          "64 bits",
+          "128 bits",
+          "8 bits"
+        ],
+        "explain_en": "128 bits is the widely accepted floor."
+      },
+      {
+        "q": "密钥应如何产生？",
+        "options": [
+          "手工拼接",
+          "由密钥管理服务或 CSPRNG 生成",
+          "用密码哈希",
+          "用时间戳"
+        ],
+        "answer": 1,
+        "explain": "随机性必须由可信来源保证。",
+        "q_en": "How should keys be produced?",
+        "options_en": [
+          "Hand-concatenate random strings",
+          "Generated by a key management service or CSPRNG",
+          "Hash of a user password",
+          "Timestamp"
+        ],
+        "explain_en": "Key randomness must come from a trustworthy source."
+      }
+    ]
+  },
+  {
+    "id": "cwe-1021",
+    "kind": "cwe",
+    "category": "Web 安全",
+    "cwe": "CWE-1021",
+    "title": "点击劫持",
+    "title_en": "Improper Restriction of Rendered UI Layers",
+    "level": "beginner",
+    "icon": "CLICK",
+    "color": "web",
+    "summary": "攻击者用透明 iframe 覆盖在诱导页面上，让用户在不知情的情况下点到真实站点的按钮。",
+    "summary_en": "Transparent iframes trick users into clicking real site controls.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "浏览器允许页面通过 iframe 嵌入其他站点。攻击者把目标站点嵌进来并设为全透明，覆盖在一个有诱导文案的页面上。用户以为点的是「领取奖励」，实际点的是目标站点的「确认转账」按钮。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Browsers allow pages to embed other sites in iframes. An attacker embeds the target fully transparent, overlaying a decoy page. Users think they are clicking claim reward but actually click confirm transfer on the target site."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "响应头缺少 X-Frame-Options 或 CSP frame-ancestors；认为只有支付页面需要防护；老系统未统一配置安全头。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Responses lack X-Frame-Options or CSP frame-ancestors; teams assume only payment pages need protection; legacy systems never applied security headers."
+      },
+      {
+        "h": "如何发现",
+        "p": "检查响应头是否含 X-Frame-Options 或 CSP 的 frame-ancestors 指令；用简单 HTML 尝试嵌入目标页面观察是否被拒绝。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Check whether responses include X-Frame-Options or CSP frame-ancestors; try embedding the target with a minimal HTML page and see whether it is refused."
+      },
+      {
+        "h": "解决办法",
+        "p": "全站下发 CSP frame-ancestors 'none' 或 'self'。高危操作增加二次确认。JS 侧作为补充可用 frame-busting，但不能作为唯一防线。",
+        "code": [
+          {
+            "lang": "text",
+            "title": "缺安全头",
+            "bad": "# Any missing anti-nesting header",
+            "good": "Content-Security-Policy: frame-ancestors 'none'\nX-Frame-Options: DENY",
+            "note": "两条头同时下发，兼容老浏览器",
+            "title_en": "Missing security headers",
+            "note_en": "Send both headers for older browser compatibility"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Send CSP frame-ancestors 'none' or 'self' site-wide. Add confirmation for high-risk actions. Frame-busting JavaScript is only a supplement, never the sole defense."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-1021",
+        "url": "https://cwe.mitre.org/data/definitions/1021.html"
+      }
+    ],
+    "tags": [
+      "Web",
+      "前端"
+    ],
+    "quiz": [
+      {
+        "q": "点击劫持的技术基础是？",
+        "options": [
+          "Cookie 被窃取",
+          "透明 iframe 覆盖在诱导页面上",
+          "DNS 污染",
+          "证书伪造"
+        ],
+        "answer": 1,
+        "explain": "用户以为点的是诱饵，实际点到被嵌入的真实页面控件。",
+        "q_en": "Technical basis of clickjacking?",
+        "options_en": [
+          "Stolen cookies",
+          "Transparent iframes stacked under a decoy page",
+          "DNS poisoning",
+          "Forged certificates"
+        ],
+        "explain_en": "Users think they click the decoy but hit real controls underneath."
+      },
+      {
+        "q": "防御点击劫持最有效的响应头是？",
+        "options": [
+          "Content-Type",
+          "Content-Security-Policy: frame-ancestors",
+          "Referrer-Policy",
+          "ETag"
+        ],
+        "answer": 1,
+        "explain": "frame-ancestors 直接限制谁能嵌入本页。",
+        "q_en": "Most effective response header against clickjacking?",
+        "options_en": [
+          "Content-Type",
+          "Content-Security-Policy: frame-ancestors",
+          "Referrer-Policy",
+          "ETag"
+        ],
+        "explain_en": "frame-ancestors restricts who may embed the page."
+      },
+      {
+        "q": "X-Frame-Options 与 CSP 的关系是？",
+        "options": [
+          "互相替代",
+          "CSP 更新更灵活，两者同时下发兼容老浏览器",
+          "只能用其中一个",
+          "都无效"
+        ],
+        "answer": 1,
+        "explain": "现代浏览器优先 CSP，老浏览器回退到 X-Frame-Options。",
+        "q_en": "Relationship between X-Frame-Options and CSP?",
+        "options_en": [
+          "Mutually exclusive",
+          "CSP is more flexible; send both for older browsers",
+          "Only one works",
+          "Both useless"
+        ],
+        "explain_en": "Modern browsers prefer CSP; older ones fall back to X-Frame-Options."
+      }
+    ]
+  },
+  {
+    "id": "cwe-1333",
+    "kind": "cwe",
+    "category": "资源管理",
+    "cwe": "CWE-1333",
+    "title": "正则表达式拒绝服务 ReDoS",
+    "title_en": "Inefficient Regular Expression Complexity",
+    "level": "intermediate",
+    "icon": "REDOS",
+    "color": "dos",
+    "summary": "存在灾难性回溯的正则被输入触发后，CPU 占用飙升，单次请求即可拖垮服务。",
+    "summary_en": "Catastrophic backtracking in regex stalls the CPU.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "NFA 正则引擎在匹配失败时会尝试所有可能的分支组合。形如 (a+)+$ 的模式，面对 aaaa...a! 这样的输入，回溯次数随长度指数增长。一个几十字节的输入就能让单核跑满数分钟。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "NFA regex engines try every possible branch combination when a match fails. A pattern like (a+)+$ against aaaa...a! causes backtracking that grows exponentially with length. A few dozen bytes of input can saturate one CPU core for minutes."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为了匹配宽松格式而写出嵌套量词；在服务端用正则解析用户提交的复杂文本；第三方校验库内部有脆弱正则；缺少输入长度限制与执行超时。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Nested quantifiers written to match loose formats; server-side regex parsing complex user-submitted text; vulnerable regex inside third-party validation libraries; missing input length limits and execution timeouts."
+      },
+      {
+        "h": "如何发现",
+        "p": "用 ReDoS 检测工具静态扫描正则；构造形如 aaaa...X 的失败输入测量执行时间随长度的变化；观察 CPU 在特定请求下是否飙升。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Static scan regexes with ReDoS detection tools; craft failing inputs like aaaa...X and measure execution time growth with length; watch for CPU spikes on specific requests."
+      },
+      {
+        "h": "解决办法",
+        "p": "改写正则消除嵌套量词与重叠可选分支。使用 RE2、Rust regex 这类保证线性时间的引擎。对输入长度设上限。为解析操作设置执行超时并放入可中断的执行上下文。",
+        "code": [
+          {
+            "lang": "javascript",
+            "title": "脆弱正则",
+            "bad": "const re = /^(a+)+$/;",
+            "good": "const re = /^a+$/;",
+            "note": "去掉嵌套量词，回溯次数从指数级降到线性",
+            "title_en": "Vulnerable regex",
+            "note_en": "Removing nested quantifiers takes backtracking from exponential to linear"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Rewrite regexes to remove nested quantifiers and overlapping alternatives. Use engines that guarantee linear time, such as RE2 or Rust regex. Cap input length. Set execution timeouts and run parsing in an interruptible context."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-1333",
+        "url": "https://cwe.mitre.org/data/definitions/1333.html"
+      },
+      {
+        "name": "OWASP ReDoS",
+        "url": "https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS"
+      }
+    ],
+    "tags": [
+      "可用性",
+      "正则"
+    ],
+    "quiz": [
+      {
+        "q": "ReDoS 的本质是？",
+        "options": [
+          "请求太多",
+          "正则引擎灾难性回溯导致 CPU 被占满",
+          "磁盘写满",
+          "内存泄漏"
+        ],
+        "answer": 1,
+        "explain": "嵌套量词让失败匹配的回溯次数随输入长度指数增长。",
+        "q_en": "Essence of ReDoS?",
+        "options_en": [
+          "Too many requests",
+          "Catastrophic regex backtracking saturates CPU",
+          "Disk full",
+          "Memory leak"
+        ],
+        "explain_en": "Nested quantifiers make backtracking grow exponentially."
+      },
+      {
+        "q": "下面哪个正则更可能引发 ReDoS？",
+        "options": [
+          "^a+$",
+          "^(a+)+$",
+          "^[a-z]+$",
+          "^\\d{1,8}$"
+        ],
+        "answer": 1,
+        "explain": "嵌套量词在失败时会尝试大量组合。",
+        "q_en": "Which regex is more likely to cause ReDoS?",
+        "options_en": [
+          "^a+$",
+          "^(a+)+$",
+          "^[a-z]+$",
+          "^\\d{1,8}$"
+        ],
+        "explain_en": "Nested quantifiers try huge numbers of combinations on failure."
+      },
+      {
+        "q": "根治 ReDoS 的方向是？",
+        "options": [
+          "限制输入长度即可",
+          "消除嵌套量词，或改用线性时间引擎（如 RE2）",
+          "增加服务器 CPU",
+          "加缓存"
+        ],
+        "answer": 1,
+        "explain": "从算法复杂度上根治，而不是靠限制输入兜底。",
+        "q_en": "Direction for a real fix?",
+        "options_en": [
+          "Just limit input length",
+          "Remove nested quantifiers or use a linear-time engine like RE2",
+          "Add CPU",
+          "Add caching"
+        ],
+        "explain_en": "Fix the algorithmic complexity, not just the input size."
+      }
+    ]
+  },
+  {
+    "id": "cwe-601",
+    "kind": "cwe",
+    "category": "Web 安全",
+    "cwe": "CWE-601",
+    "title": "开放重定向",
+    "title_en": "URL Redirection to Untrusted Site",
+    "level": "beginner",
+    "icon": "REDIR",
+    "color": "web",
+    "summary": "跳转参数未校验目标域名，攻击者可借助可信域名的链接把用户导向钓鱼站。",
+    "summary_en": "Unvalidated redirect targets send users to attacker sites.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "登录后跳转、短链服务、SSO 回调等场景会有 ?next= 之类参数。若不校验目标，攻击者构造 https://trusted.com/login?next=https://evil.com，链接前半段是可信域名，用户难以分辨，点击后落到钓鱼页。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "Login redirects, short link services, and SSO callbacks carry parameters like ?next=. Without validating the target, an attacker builds https://trusted.com/login?next=https://evil.com. The first half is a trusted domain, users cannot tell, and they land on a phishing page."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "直接使用用户提供的值做跳转；只校验以 http 开头；黑名单校验域名，被 //evil.com、https://trusted.com@evil.com、子域名混淆绕过。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Using the user-supplied value directly for the redirect; validating only that it starts with http; domain blacklists bypassed with //evil.com, https://trusted.com@evil.com, or subdomain confusion."
+      },
+      {
+        "h": "如何发现",
+        "p": "在跳转参数填 https://evil.com、//evil.com、/\\evil.com、https://trusted.com.evil.com 观察是否发生跳转；检查 Location 响应头。",
+        "code": [],
+        "h_en": "How to find it",
+        "p_en": "Fill redirect parameters with https://evil.com, //evil.com, /\\evil.com, and https://trusted.com.evil.com and observe whether a redirect happens; inspect the Location header."
+      },
+      {
+        "h": "解决办法",
+        "p": "使用相对路径或白名单映射（传 key 由服务端查表得出目标 URL）。必须接受绝对 URL 时，解析后校验协议为 https 且域名在白名单内，并做规范化处理防止绕过。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "直接用 next 参数",
+            "bad": "return redirect(request.args.get(\"next\"))",
+            "good": "ALLOWED = {\"/home\": \"/home\", \"/orders\": \"/orders\"}\nreturn redirect(ALLOWED.get(request.args.get(\"next\"), \"/home\"))",
+            "note": "只接受预定义 key，目标地址由服务端给出",
+            "title_en": "Using the next parameter directly",
+            "note_en": "Accept only predefined keys; the server supplies the destination"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use relative paths or whitelist mapping (pass a key and let the server resolve the target URL). When absolute URLs must be accepted, parse and verify the scheme is https and the domain is whitelisted, with normalization to prevent bypasses."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-601",
+        "url": "https://cwe.mitre.org/data/definitions/601.html"
+      }
+    ],
+    "tags": [
+      "Web",
+      "钓鱼"
+    ],
+    "quiz": [
+      {
+        "q": "开放重定向为什么常被用于钓鱼？",
+        "options": [
+          "因为它能窃取 Cookie",
+          "因为链接前半段是可信域名，用户难以分辨",
+          "因为它能提权",
+          "因为它能读文件"
+        ],
+        "answer": 1,
+        "explain": "攻击者把恶意地址藏在可信域名的参数里。",
+        "q_en": "Why is open redirect popular for phishing?",
+        "options_en": [
+          "It steals cookies",
+          "The first half of the link is a trusted domain, hard to spot",
+          "It escalates privilege",
+          "It reads files"
+        ],
+        "explain_en": "Attackers hide malicious targets inside trusted-domain parameters."
+      },
+      {
+        "q": "防御开放重定向推荐的做法是？",
+        "options": [
+          "黑名单过滤 evil.com",
+          "使用白名单映射：传 key 由服务端查表给出目标",
+          "只允许 https",
+          "限制参数长度"
+        ],
+        "answer": 1,
+        "explain": "黑名单会被域名混淆、@ 符号等手法绕过。",
+        "q_en": "Recommended defense for open redirect?",
+        "options_en": [
+          "Blacklist evil.com",
+          "Whitelist mapping: pass a key and let the server resolve the target",
+          "Require HTTPS",
+          "Limit parameter length"
+        ],
+        "explain_en": "Blacklists lose to domain confusion and @ tricks."
+      },
+      {
+        "q": "下面哪个值最可能绕过简单的\"以 http 开头\"校验？",
+        "options": [
+          "https://good.com",
+          "//evil.com",
+          "/home",
+          "#top"
+        ],
+        "answer": 1,
+        "explain": "协议相对地址会跳到 evil.com，且不以 http 开头。",
+        "q_en": "Which value most likely bypasses a naive starts-with-http check?",
+        "options_en": [
+          "https://good.com",
+          "//evil.com",
+          "/home",
+          "#top"
+        ],
+        "explain_en": "A protocol-relative URL navigates to evil.com without starting with http."
+      }
+    ]
+  }
+]

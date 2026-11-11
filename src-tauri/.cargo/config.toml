@@ -1,0 +1,4 @@
+# 目标机零配置：静态链接 CRT，产物不依赖 vcruntime140.dll / msvcp140.dll
+# 对应报告书 2.4 的 Z1 约束
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -1,0 +1,1114 @@
+[
+  {
+    "id": "ir-lifecycle",
+    "kind": "lesson",
+    "category": "应急响应",
+    "cwe": null,
+    "title": "应急响应的六个阶段",
+    "title_en": "Incident Response Lifecycle",
+    "level": "intermediate",
+    "icon": "IR6",
+    "color": "ir",
+    "summary": "从「发现异常」到「恢复常态」，应急响应有固定的阶段划分。跳过任何一步，都会在复盘时发现漏掉的东西。",
+    "summary_en": "Incident response has defined phases; skipping any leaves gaps you find later.",
+    "sections": [
+      {
+        "h": "准备",
+        "p": "事件发生前就要完成的事：建立资产清单与网络拓扑图、部署日志集中采集、准备隔离手段（网络分段、账号冻结流程）、明确谁有权决定「断网」、留存应急联系人。没有准备阶段的组织，事发时第一步就是找谁负责。",
+        "h_en": "Preparation",
+        "p_en": "What must be done before an incident: maintain an asset inventory and network topology, deploy centralized log collection, prepare isolation mechanisms (segmentation, account freezing), define who may decide to cut the network, and keep emergency contacts current. Organizations without preparation spend step one looking for an owner."
+      },
+      {
+        "h": "识别与定性",
+        "p": "判断「这是不是安全事件」。线索来源包括：告警系统（EDR、WAF、IDS）、异常登录、用户报告、外部通报、威胁情报命中。定性时要回答三个问题：影响哪些资产、是否仍在持续、攻击者是否已获得控制权。",
+        "h_en": "Identification and triage",
+        "p_en": "Decide whether this is a security incident. Sources include alerting systems (EDR, WAF, IDS), anomalous logins, user reports, external notifications, and threat intelligence hits. Triage must answer three questions: which assets are affected, is it ongoing, and has the attacker gained control."
+      },
+      {
+        "h": "遏制",
+        "p": "目标是止血而非根治。手段包括：隔离受影响主机（断网但保持供电以便取证）、禁用被攻破账号、封禁出口 IP、临时下线服务。遏制要权衡「止血」与「破坏证据」，优先保全内存与日志再做清理。",
+        "h_en": "Containment",
+        "p_en": "The goal is to stop the bleeding, not to cure. Options include isolating affected hosts (network isolation while keeping power for forensics), disabling compromised accounts, blocking egress IPs, and taking services offline temporarily. Balance stopping the bleeding against destroying evidence: preserve memory and logs before cleanup."
+      },
+      {
+        "h": "根除",
+        "p": "清除攻击者的立足点。这一步最容易做浅：只打了补丁，没清后门；只杀了进程，没查持久化。必须逐项排查计划任务、服务、启动项、账号、WebShell、SSH 授权密钥、容器镜像。",
+        "h_en": "Eradication",
+        "p_en": "Remove the attacker's foothold. This step is most often done superficially: patched but no backdoor removed, process killed but persistence unchecked. Systematically check scheduled tasks, services, startup entries, accounts, webshells, SSH authorized keys, and container images."
+      },
+      {
+        "h": "恢复",
+        "p": "从可信来源重建系统——重装或从干净备份恢复，而不是在受污染的系统上继续跑。恢复后要持续观察一段时间，确认没有二次回连。分批恢复，先恢复非核心业务验证。",
+        "h_en": "Recovery",
+        "p_en": "Rebuild from a trusted source: reinstall or restore from clean backups rather than continuing on a compromised host. Observe for a period after recovery to confirm no callback. Recover in stages, starting with non-critical services to validate."
+      },
+      {
+        "h": "复盘",
+        "p": "产出可执行的改进项，而不是一份描述性报告。每条改进项要能落到具体动作上：加一条检测规则、改一处架构、补一个流程。无主的结论等于没有结论。",
+        "h_en": "Retrospective",
+        "p_en": "Produce actionable improvements, not descriptive reports. Every item must map to a concrete action: add a detection rule, change an architecture point, patch a process. Conclusions without an owner are not conclusions."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-61 Rev.2",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r2/final"
+      },
+      {
+        "name": "CISA Incident & Vulnerability Response Playbooks",
+        "url": "https://www.cisa.gov/resources-tools/resources/federal-government-cybersecurity-incident-and-vulnerability-response-playbooks"
+      }
+    ],
+    "tags": [
+      "应急响应",
+      "流程"
+    ],
+    "quiz": [
+      {
+        "q": "为什么要先遏制再根除，而不是直接清理？",
+        "options": [
+          "流程规定",
+          "清理会破坏证据且攻击者可能仍在活动，先止血才能稳住局面",
+          "清理太慢",
+          "遏制成本更低"
+        ],
+        "answer": 1,
+        "explain": "遏制争取时间，取证与根除才有依据。",
+        "q_en": "Why contain before eradicating rather than cleaning up directly?",
+        "options_en": [
+          "Policy requires it",
+          "Cleanup destroys evidence and the attacker may still be active; stop the bleeding first",
+          "Cleanup is slower",
+          "Containment is cheaper"
+        ],
+        "explain_en": "Containment buys time for forensics and eradication."
+      },
+      {
+        "q": "恢复阶段推荐的做法是？",
+        "options": [
+          "在受污染系统上继续运行",
+          "从可信备份恢复或重建系统",
+          "只杀掉进程",
+          "只修改密码"
+        ],
+        "answer": 1,
+        "explain": "受污染系统的可信度无法保证。",
+        "q_en": "Recommended recovery approach?",
+        "options_en": [
+          "Continue on the compromised system",
+          "Restore from trusted backups or rebuild",
+          "Only kill processes",
+          "Only change passwords"
+        ],
+        "explain_en": "A compromised system cannot be trusted."
+      },
+      {
+        "q": "复盘的产出应该是什么？",
+        "options": [
+          "一份描述性报告",
+          "可执行、有归属的改进项",
+          "一封通报邮件",
+          "一次会议纪要"
+        ],
+        "answer": 1,
+        "explain": "不可执行的结论无法防止复发。",
+        "q_en": "What should the retrospective produce?",
+        "options_en": [
+          "A descriptive report",
+          "Actionable, owned improvements",
+          "An email",
+          "Meeting minutes"
+        ],
+        "explain_en": "Non-executable conclusions cannot prevent recurrence."
+      },
+      {
+        "q": "识别与定性阶段要回答的三个问题是？",
+        "options": [
+          "谁、何时、为何",
+          "影响哪些资产、是否仍在持续、是否已失守",
+          "花了多少钱、影响多大、谁背锅",
+          "用了什么工具、什么语言、什么框架"
+        ],
+        "answer": 1,
+        "explain": "这三个问题决定后续处置的力度与节奏。",
+        "q_en": "Three questions triage must answer?",
+        "options_en": [
+          "Who, when, why",
+          "Which assets, is it ongoing, has control been lost",
+          "Cost, impact, blame",
+          "Tools, language, framework"
+        ],
+        "explain_en": "These determine the intensity and pace of response."
+      }
+    ]
+  },
+  {
+    "id": "ir-triage-first-hour",
+    "kind": "lab",
+    "category": "应急响应",
+    "cwe": null,
+    "title": "第一小时：拿到告警后做什么",
+    "title_en": "The First Hour After an Alert",
+    "level": "advanced",
+    "icon": "1H",
+    "color": "ir",
+    "summary": "从收到一条「主机疑似失陷」的告警开始，按固定顺序推进，避免慌乱中破坏现场。",
+    "summary_en": "A fixed order of operations from a host-compromise alert, so the scene stays intact.",
+    "sections": [
+      {
+        "h": "第 0–5 分钟：记录与确认",
+        "p": "先把告警原文、时间、告警来源、主机名与 IP 完整记录下来。不要立刻登上去操作。确认告警是否真实：查同类告警是否有历史记录、是否与已知的误报模式一致、是否有多个告警指向同一主机。",
+        "h_en": "Minutes 0-5: record and confirm",
+        "p_en": "Record the alert text, time, source, hostname, and IP in full. Do not log into the host yet. Confirm authenticity: check for historical records of similar alerts, whether it matches known false positive patterns, and whether multiple alerts point at the same host."
+      },
+      {
+        "h": "第 5–15 分钟：只读排查",
+        "p": "用只读命令收集现状：进程列表与父进程关系、网络连接与监听端口、登录记录、最近创建的文件、定时任务与服务、启动项。全部输出重定向到外部存储，不要写回受害主机。",
+        "h_en": "Minutes 5-15: read-only triage",
+        "p_en": "Collect state using read-only commands: process list with parent relationships, network connections and listening ports, login records, recently created files, scheduled tasks and services, startup entries. Redirect all output to external storage; write nothing back to the compromised host."
+      },
+      {
+        "h": "第 15–25 分钟：保全关键证据",
+        "p": "内存镜像优先（进程、网络连接、解密密钥只在内存里）。其次导出关键日志（安全日志、Web 访问日志、应用日志）。文件系统镜像如果时间允许再做。记录每个操作的执行人与时间。",
+        "h_en": "Minutes 15-25: preserve key evidence",
+        "p_en": "Memory images come first (processes, network connections, and decryption keys exist only in memory). Then export critical logs (security, web access, application). Filesystem images if time allows. Record the operator and time for every action."
+      },
+      {
+        "h": "第 25–40 分钟：判定影响范围",
+        "p": "从受害主机向外扩展：它访问过哪些内网资产、哪些账号在它上面登录过、是否有横向移动痕迹（远程登录、共享访问、凭据使用）。用一个清单列出「已确认受影响」「疑似受影响」「已排除」。",
+        "h_en": "Minutes 25-40: scope the impact",
+        "p_en": "Expand outward from the host: which internal assets it accessed, which accounts logged into it, whether there are lateral movement traces (remote logins, share access, credential use). Maintain a list of confirmed, suspected, and excluded."
+      },
+      {
+        "h": "第 40–60 分钟：决策与通报",
+        "p": "判断是否需要升级：是否需要隔离主机、是否需要断网、是否需要通知上级与合规。做出决策并记录理由——事后复盘时，决策依据比决策本身更重要。",
+        "h_en": "Minutes 40-60: decide and notify",
+        "p_en": "Decide whether to escalate: isolate the host, cut the network, notify leadership and compliance. Make decisions and record the rationale; after the fact, the basis matters more than the decision."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-61 Rev.2",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r2/final"
+      },
+      {
+        "name": "SANS Incident Handler's Handbook",
+        "url": "https://www.sans.org/white-papers/33901/"
+      }
+    ],
+    "tags": [
+      "应急响应",
+      "实战",
+      "取证"
+    ],
+    "quiz": [
+      {
+        "q": "收到失陷告警后第一步应该？",
+        "options": [
+          "立刻重启主机",
+          "记录告警原文与时间，确认告警真实性",
+          "直接删除可疑文件",
+          "格式化重装"
+        ],
+        "answer": 1,
+        "explain": "贸然操作会破坏现场，先记录再确认。",
+        "q_en": "First step on a compromise alert?",
+        "options_en": [
+          "Reboot the host immediately",
+          "Record the alert text and time, then confirm authenticity",
+          "Delete suspicious files",
+          "Format and reinstall"
+        ],
+        "explain_en": "Acting rashly destroys the scene; record before confirming."
+      },
+      {
+        "q": "为什么内存镜像要优先于磁盘镜像？",
+        "options": [
+          "内存体积更小",
+          "进程、网络连接与解密密钥只存在于内存",
+          "磁盘太大不好存",
+          "流程规定如此"
+        ],
+        "answer": 1,
+        "explain": "重启或断电后内存内容就消失了。",
+        "q_en": "Why does memory imaging take priority over disk?",
+        "options_en": [
+          "Memory is smaller",
+          "Processes, connections, and decryption keys exist only in memory",
+          "Disks are too large",
+          "Policy requires it"
+        ],
+        "explain_en": "Reboot or power loss erases memory contents."
+      },
+      {
+        "q": "判断影响范围时最该关注什么？",
+        "options": [
+          "主机型号",
+          "该主机访问过的内网资产与被登录过的账号",
+          "磁盘容量",
+          "操作系统版本"
+        ],
+        "answer": 1,
+        "explain": "横向移动痕迹决定事件规模。",
+        "q_en": "What matters most when scoping impact?",
+        "options_en": [
+          "Host model",
+          "Internal assets it accessed and accounts that logged in",
+          "Disk capacity",
+          "OS version"
+        ],
+        "explain_en": "Lateral movement traces determine incident scale."
+      },
+      {
+        "q": "只读排查的结果应该写到哪里？",
+        "options": [
+          "受害主机本地",
+          "外部存储，避免写回受害主机",
+          "聊天记录",
+          "不需要保存"
+        ],
+        "answer": 1,
+        "explain": "写回受害主机会覆盖证据时间戳。",
+        "q_en": "Where should read-only triage output be written?",
+        "options_en": [
+          "On the victim host",
+          "External storage, never back to the victim",
+          "Chat history",
+          "No need to save"
+        ],
+        "explain_en": "Writing back overwrites evidence timestamps."
+      }
+    ]
+  },
+  {
+    "id": "ir-evidence",
+    "kind": "lesson",
+    "category": "应急响应",
+    "cwe": null,
+    "title": "证据保全：别把现场弄丢",
+    "title_en": "Evidence Preservation",
+    "level": "advanced",
+    "icon": "EVID",
+    "color": "ir",
+    "summary": "应急响应中最常见的事故不是攻击，而是自己把证据毁了：重启、清理、覆盖日志。",
+    "summary_en": "The most common IR mistake is destroying your own evidence: reboots, cleanups, log overwrites.",
+    "sections": [
+      {
+        "h": "易失性顺序",
+        "p": "按易失性从高到低采集：CPU 寄存器与缓存 → 内存 → 网络连接与路由表 → 运行中进程 → 磁盘 → 远程日志 → 备份介质 → 纸质记录。越靠前的重启就没了，所以要先采。",
+        "h_en": "Volatility order",
+        "p_en": "Collect from most to least volatile: CPU registers and cache, memory, network connections and routing tables, running processes, disk, remote logs, backup media, paper records. Earlier items vanish on reboot, so they must be captured first."
+      },
+      {
+        "h": "完整性保障",
+        "p": "每个证据文件采集后立刻计算哈希（SHA-256）并记录。原始介质只读挂载，分析在副本上进行。建立证据链记录：谁在什么时间、用什么工具、采集了什么、存放位置。",
+        "h_en": "Integrity assurance",
+        "p_en": "Hash each evidence file immediately after collection (SHA-256) and record it. Mount original media read-only and analyze copies. Maintain a chain of custody: who collected what, when, with which tool, and where it is stored."
+      },
+      {
+        "h": "常见破坏行为",
+        "p": "重启主机（内存丢失、临时文件清空）；运行杀毒软件全盘扫描（可能删除恶意样本）；清理临时目录；直接删除可疑文件；用受害主机自己的工具做分析（工具可能被替换）。",
+        "h_en": "Common destructive actions",
+        "p_en": "Rebooting the host (losing memory and clearing temp files); running a full antivirus scan (possibly deleting the malicious sample); clearing temp directories; deleting suspicious files outright; using the host's own tools for analysis (the tools may be replaced)."
+      },
+      {
+        "h": "跨平台采集要点",
+        "p": "Linux：/proc 下的进程与网络、/var/log、bash_history、crontab、systemd 单元、/etc/passwd 与 shadow。Windows：内存镜像、事件日志（安全/系统/PowerShell）、注册表 Run 键、计划任务、服务、Prefetch。容器：容器内文件系统快照与镜像层信息。",
+        "h_en": "Cross-platform collection points",
+        "p_en": "Linux: processes and network under /proc, /var/log, bash_history, crontab, systemd units, /etc/passwd and shadow. Windows: memory image, event logs (security, system, PowerShell), registry Run keys, scheduled tasks, services, Prefetch. Containers: filesystem snapshots and image layer information."
+      },
+      {
+        "h": "对外提供证据时的注意",
+        "p": "如果涉及司法或监管，需要符合取证规范：使用经过验证的工具、全程录像、双人见证。企业内部复盘则可以简化，但不能省略哈希记录这一步。",
+        "h_en": "When evidence goes external",
+        "p_en": "For legal or regulatory matters, follow forensic standards: validated tools,全程 recording, and dual witnesses. Internal retrospectives can be simpler but must still include hash records."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-86",
+        "url": "https://csrc.nist.gov/pubs/sp/800/86/final"
+      },
+      {
+        "name": "RFC 3227 Guidelines for Evidence Collection",
+        "url": "https://www.rfc-editor.org/rfc/rfc3227"
+      }
+    ],
+    "tags": [
+      "取证",
+      "应急响应"
+    ],
+    "quiz": [
+      {
+        "q": "证据采集的易失性顺序是？",
+        "options": [
+          "磁盘优先",
+          "内存与网络连接优先于磁盘",
+          "日志优先于一切",
+          "顺序无所谓"
+        ],
+        "answer": 1,
+        "explain": "重启即消失的部分必须最先采集。",
+        "q_en": "Volatility order for evidence collection?",
+        "options_en": [
+          "Disk first",
+          "Memory and network connections before disk",
+          "Logs before everything",
+          "Order does not matter"
+        ],
+        "explain_en": "What vanishes on reboot must be captured first."
+      },
+      {
+        "q": "采集后立刻要做什么？",
+        "options": [
+          "压缩打包",
+          "计算哈希并记录",
+          "上传到云端",
+          "交给主管"
+        ],
+        "answer": 1,
+        "explain": "哈希用于后续证明证据未被篡改。",
+        "q_en": "What must be done immediately after collection?",
+        "options_en": [
+          "Compress it",
+          "Compute and record a hash",
+          "Upload to cloud",
+          "Hand to management"
+        ],
+        "explain_en": "Hashes later prove the evidence was not altered."
+      },
+      {
+        "q": "下面哪个行为会破坏证据？",
+        "options": [
+          "只读挂载",
+          "重启主机",
+          "计算哈希",
+          "导出日志"
+        ],
+        "answer": 1,
+        "explain": "重启会丢失内存中的关键证据。",
+        "q_en": "Which action destroys evidence?",
+        "options_en": [
+          "Read-only mount",
+          "Rebooting the host",
+          "Computing hashes",
+          "Exporting logs"
+        ],
+        "explain_en": "Rebooting loses critical in-memory evidence."
+      },
+      {
+        "q": "为什么不要在受害主机上运行杀毒全盘扫描？",
+        "options": [
+          "扫描太慢",
+          "可能删除恶意样本，导致后续无法分析",
+          "占用内存",
+          "会触发告警"
+        ],
+        "answer": 1,
+        "explain": "样本本身就是最关键的证据。",
+        "q_en": "Why not run a full antivirus scan on the victim host?",
+        "options_en": [
+          "Too slow",
+          "It may delete the malicious sample, preventing later analysis",
+          "Memory usage",
+          "Triggers alerts"
+        ],
+        "explain_en": "The sample itself is the most critical evidence."
+      }
+    ]
+  },
+  {
+    "id": "ir-contain",
+    "kind": "lab",
+    "category": "应急响应",
+    "cwe": null,
+    "title": "遏制手段的取舍清单",
+    "title_en": "Choosing Containment Actions",
+    "level": "intermediate",
+    "icon": "CTN",
+    "color": "ir",
+    "summary": "每种遏制手段都有代价。断网能止血，但也可能惊动攻击者、破坏证据、中断业务。",
+    "summary_en": "Every containment action has a cost: business impact, tipping off attackers, or losing evidence.",
+    "sections": [
+      {
+        "h": "隔离主机",
+        "p": "优点：立即阻断横向移动。代价：攻击者若在监控该主机，会察觉被发现并可能加速破坏。做法：优先采用网络层隔离保留管理通道，便于远程取证；避免直接关机。",
+        "h_en": "Isolating a host",
+        "p_en": "Benefit: immediately blocks lateral movement. Cost: if the attacker monitors the host, they notice detection and may accelerate damage. Practice: prefer network-layer isolation keeping a management channel for remote forensics; avoid powering off."
+      },
+      {
+        "h": "冻结账号",
+        "p": "优点：切断凭据滥用。代价：可能同时冻结正常运维账号导致无法处置。做法：先禁用可疑账号，同时保留至少一个高权限应急账号，并确认该账号未被污染。",
+        "h_en": "Freezing accounts",
+        "p_en": "Benefit: cuts credential abuse. Cost: may also freeze the operations account you need for response. Practice: disable suspicious accounts first while retaining at least one privileged emergency account, confirmed uncontaminated."
+      },
+      {
+        "h": "封禁出口",
+        "p": "优点：切断数据外传与 C2 回连。代价：可能影响其他业务。做法：按目的 IP 与域名精确封禁，而不是整段封锁；结合 DNS 与代理日志确认外联目标。",
+        "h_en": "Blocking egress",
+        "p_en": "Benefit: cuts data exfiltration and C2 callbacks. Cost: may affect other services. Practice: block specific destination IPs and domains rather than whole ranges, confirmed through DNS and proxy logs."
+      },
+      {
+        "h": "离线服务",
+        "p": "优点：彻底阻断攻击路径。代价：业务中断、用户可见。做法：作为最后手段，且需有明确的决策人与恢复时间预期。",
+        "h_en": "Taking services offline",
+        "p_en": "Benefit: fully blocks the attack path. Cost: business interruption and user-visible impact. Practice: a last resort requiring a named decision maker and an expected recovery time."
+      },
+      {
+        "h": "决策记录",
+        "p": "无论选择哪种手段，都要记录：决策人、时间、理由、预期影响、回滚方式。没有记录的遏制会在复盘时变成「不知道当时为什么这么做」。",
+        "h_en": "Decision record",
+        "p_en": "Whatever you choose, record the decision maker, time, rationale, expected impact, and rollback plan. Undocumented containment becomes why did we do that in the retrospective."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-61 Rev.2",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r2/final"
+      },
+      {
+        "name": "CISA Playbooks",
+        "url": "https://www.cisa.gov/resources-tools/resources/federal-government-cybersecurity-incident-and-vulnerability-response-playbooks"
+      }
+    ],
+    "tags": [
+      "应急响应",
+      "处置"
+    ],
+    "quiz": [
+      {
+        "q": "隔离主机时不建议直接关机的理由是？",
+        "options": [
+          "关机更慢",
+          "关机丢失内存证据，且可能提醒攻击者",
+          "关机更耗电",
+          "流程不允许"
+        ],
+        "answer": 1,
+        "explain": "网络隔离优于断电。",
+        "q_en": "Why is powering off not recommended when isolating a host?",
+        "options_en": [
+          "Slower",
+          "Loses memory evidence and may alert the attacker",
+          "Power consumption",
+          "Policy forbids it"
+        ],
+        "explain_en": "Network isolation is preferable to power loss."
+      },
+      {
+        "q": "封禁出口时应优先？",
+        "options": [
+          "整段 IP 封锁",
+          "按目的 IP 与域名精确封禁",
+          "关闭所有网络",
+          "只封 80 端口"
+        ],
+        "answer": 1,
+        "explain": "精确封禁减少业务影响。",
+        "q_en": "How should egress be blocked?",
+        "options_en": [
+          "Whole IP ranges",
+          "Precise blocking by destination IP and domain",
+          "Disable all networking",
+          "Block only port 80"
+        ],
+        "explain_en": "Precise blocking minimizes business impact."
+      },
+      {
+        "q": "遏制决策必须记录什么？",
+        "options": [
+          "只记时间",
+          "决策人、理由、预期影响与回滚方式",
+          "只记结果",
+          "不需要记录"
+        ],
+        "answer": 1,
+        "explain": "复盘时需要知道当时的判断依据。",
+        "q_en": "What must a containment decision record?",
+        "options_en": [
+          "Only the time",
+          "Decision maker, rationale, expected impact, rollback plan",
+          "Only the outcome",
+          "Nothing"
+        ],
+        "explain_en": "Retrospectives need the basis for the decision."
+      },
+      {
+        "q": "攻击者可能正在监控受害主机时，隔离动作的风险是？",
+        "options": [
+          "没有风险",
+          "可能惊动对方并加速破坏，需配合快速处置",
+          "会导致断网",
+          "影响日志采集"
+        ],
+        "answer": 1,
+        "explain": "所以要评估「惊动成本」再决定动作顺序。",
+        "q_en": "Risk of isolating while the attacker monitors the host?",
+        "options_en": [
+          "None",
+          "May tip them off and accelerate damage; pair with fast response",
+          "Network outage",
+          "Affects log collection"
+        ],
+        "explain_en": "Assess the cost of tipping them off before acting."
+      }
+    ]
+  },
+  {
+    "id": "ir-persistence",
+    "kind": "cwe",
+    "category": "应急响应",
+    "cwe": "CWE-506",
+    "title": "持久化后门",
+    "title_en": "Embedded Malicious Code / Persistence",
+    "level": "advanced",
+    "icon": "BACK",
+    "color": "ir",
+    "summary": "攻击者拿到权限后第一件事是建立持久化。只打补丁不清后门，等于把门锁换了但钥匙还在对方手里。",
+    "summary_en": "Attackers establish persistence first; patching without removal leaves them a way back.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "持久化让攻击者在重启、改密、打补丁之后仍能回来。机制极为多样：Windows 的计划任务、服务、Run 注册表键、WMI 订阅、COM 劫持；Linux 的 crontab、systemd 单元、rc.local、SSH authorized_keys、PAM 模块、ld.so.preload；应用层的 WebShell、插件、模板注入点。",
+        "h_en": "Principle",
+        "p_en": "Persistence lets attackers return after reboots, password changes, and patching. Mechanisms are diverse: Windows scheduled tasks, services, Run registry keys, WMI subscriptions, COM hijacking; Linux crontab, systemd units, rc.local, SSH authorized_keys, PAM modules, ld.so.preload; application-level webshells, plugins, template injection points."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "响应时只关注「当前正在跑的恶意进程」，杀掉进程就以为结束了。或者只看了常见位置，漏掉了冷门机制。攻击者往往同时布置多个后门，互为备份。",
+        "h_en": "Why it happens",
+        "p_en": "Response focuses on currently running malicious processes and assumes killing them ends it, or only common locations are checked, missing rarer mechanisms. Attackers often deploy multiple backdoors as mutual backups."
+      },
+      {
+        "h": "如何发现",
+        "p": "逐项排查：Windows 用 Autoruns 类工具全量扫描；Linux 检查 systemctl list-unit-files 的异常单元、/etc/cron.*、authorized_keys 与 /etc/ld.so.preload 的改动。对比基线：与已知干净镜像做文件差异比对。查时间戳：异常时间点创建的文件。",
+        "h_en": "How to find it",
+        "p_en": "Check systematically: on Windows use an Autoruns-style tool for a full sweep; on Linux inspect unusual systemctl unit files, /etc/cron.*, authorized_keys, and changes to /etc/ld.so.preload. Compare against a baseline: diff files against a known-good image. Check timestamps: files created at anomalous times."
+      },
+      {
+        "h": "解决办法",
+        "p": "根除阶段必须做到「逐类清理 + 验证」：清理后重启，再次全量排查确认无残留。更可靠的做法是重建系统而非清理——从可信镜像重装，只迁移业务数据。对应用层后门，要审计所有可执行入口（上传目录、模板目录、插件目录）。",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "常见持久化位置排查",
+            "bad": "# Kill the suspicious process and call it done\nkill -9 $PID",
+            "good": "systemctl list-unit-files --state=enabled | grep -v -f baseline.txt\ncat /etc/crontab /etc/cron.*/* 2>/dev/null\ncat ~/.ssh/authorized_keys /root/.ssh/authorized_keys\ncat /etc/ld.so.preload\nfind / -newermt '2026-11-01' -type f -perm -u+x 2>/dev/null | head -50",
+            "note": "逐类排查并与基线比对，不要只看进程",
+            "title_en": "Checking common persistence locations",
+            "note_en": "Check each category against the baseline; do not just list processes"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Eradication must clean each category and verify: after cleanup, reboot and run the full checklist again. More reliable is rebuilding the system rather than cleaning: reinstall from a trusted image and migrate only business data. For application-level backdoors, audit all executable entry points (upload, template, plugin directories)."
+      },
+      {
+        "h": "验证",
+        "p": "清理完成后重启系统，重新跑一遍排查清单，确认无残留。观察一段时间的外联连接，确认没有回连。检查日志中是否还有可疑的周期性活动。",
+        "h_en": "Verification",
+        "p_en": "After cleanup, reboot and rerun the checklist to confirm nothing remains. Observe outbound connections for a period to confirm no callbacks. Check logs for lingering periodic activity."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE ATT&CK Persistence",
+        "url": "https://attack.mitre.org/tactics/TA0003/"
+      },
+      {
+        "name": "MITRE CWE-506",
+        "url": "https://cwe.mitre.org/data/definitions/506.html"
+      }
+    ],
+    "tags": [
+      "持久化",
+      "后门",
+      "应急响应"
+    ],
+    "quiz": [
+      {
+        "q": "为什么杀进程不足以清除后门？",
+        "options": [
+          "进程会自动重启",
+          "攻击者可能布置了多种持久化机制互为备份",
+          "杀进程太慢",
+          "进程会改名"
+        ],
+        "answer": 1,
+        "explain": "必须逐类排查持久化位置。",
+        "q_en": "Why is killing processes insufficient to remove a backdoor?",
+        "options_en": [
+          "Processes auto-restart",
+          "Attackers may deploy multiple persistence mechanisms as backups",
+          "Killing is slow",
+          "Processes rename themselves"
+        ],
+        "explain_en": "Each persistence location must be swept."
+      },
+      {
+        "q": "最可靠的根除方式是？",
+        "options": [
+          "手工逐项清理",
+          "从可信镜像重建系统并迁移业务数据",
+          "修改密码",
+          "升级组件"
+        ],
+        "answer": 1,
+        "explain": "受污染系统的清理总有遗漏风险。",
+        "q_en": "Most reliable eradication?",
+        "options_en": [
+          "Manual cleanup",
+          "Rebuild from a trusted image and migrate business data",
+          "Change passwords",
+          "Upgrade components"
+        ],
+        "explain_en": "Cleaning a compromised system always risks omissions."
+      },
+      {
+        "q": "Linux 上容易被遗漏的持久化位置是？",
+        "options": [
+          "进程列表",
+          "/etc/ld.so.preload 与 systemd 单元",
+          "磁盘容量",
+          "主机名"
+        ],
+        "answer": 1,
+        "explain": "这类位置不常被日常运维关注。",
+        "q_en": "Easily missed Linux persistence location?",
+        "options_en": [
+          "Process list",
+          "/etc/ld.so.preload and systemd units",
+          "Disk capacity",
+          "Hostname"
+        ],
+        "explain_en": "Ops rarely watches these day to day."
+      },
+      {
+        "q": "清理完成后必须做什么？",
+        "options": [
+          "直接上线",
+          "重启后再跑一遍排查清单确认无残留",
+          "写报告",
+          "通知用户"
+        ],
+        "answer": 1,
+        "explain": "部分后门只在重启后才会重新生效。",
+        "q_en": "What must follow cleanup?",
+        "options_en": [
+          "Go live immediately",
+          "Reboot and rerun the full checklist to confirm nothing remains",
+          "Write a report",
+          "Notify users"
+        ],
+        "explain_en": "Some backdoors only reactivate after reboot."
+      }
+    ]
+  },
+  {
+    "id": "ir-playbook-web",
+    "kind": "lab",
+    "category": "应急响应",
+    "cwe": "CWE-94",
+    "title": "Web 入侵处置剧本",
+    "title_en": "Web Compromise Playbook",
+    "level": "advanced",
+    "icon": "WEBIR",
+    "color": "ir",
+    "summary": "从 Web 访问日志倒推攻击链，定位入口、确认落点、清干净、堵回去。",
+    "summary_en": "Reconstruct the attack chain from access logs: entry, persistence, cleanup, prevention.",
+    "sections": [
+      {
+        "h": "第一步 从日志找入口",
+        "p": "在 Web 访问日志里搜索特征：异常的长参数、编码过的载荷（%3Cscript、..%2f）、不存在的路径大量 404、上传接口的 POST、命令执行特征（;id、|whoami）。按 IP 聚合看是否有明显的扫描-利用序列。",
+        "h_en": "Step one: find the entry in logs",
+        "p_en": "Search web access logs for signatures: unusually long parameters, encoded payloads (%3Cscript, ..%2f), mass 404s on nonexistent paths, POSTs to upload endpoints, command execution markers (;id, |whoami). Aggregate by IP to spot scan-then-exploit sequences."
+      },
+      {
+        "h": "第二步 确认落点",
+        "p": "攻击成功后通常有落盘：上传的 WebShell、被改写的模板、生成的文件。查 Web 根目录下最近修改的文件（按 mtime），重点看可执行扩展名（.php/.jsp/.aspx/.py）与不常见文件名。比对部署包与线上文件的差异是最快的方式。",
+        "h_en": "Step two: confirm the landing point",
+        "p_en": "Successful exploitation usually drops files: uploaded webshells, modified templates, generated files. Check recently modified files under the web root by mtime, focusing on executable extensions (.php/.jsp/.aspx/.py) and unusual names. Comparing the deployment package against live files is fastest."
+      },
+      {
+        "h": "第三步 判断影响范围",
+        "p": "WebShell 能执行命令，意味着攻击者可能已经提权到系统层。查 Web 进程启动的子进程、Web 账号的登录记录、数据库连接是否被改。向上排查系统层持久化。",
+        "h_en": "Step three: scope the impact",
+        "p_en": "A webshell means command execution, so the attacker may have escalated to the OS level. Check child processes spawned by the web process, login records for the web account, and whether database connections were changed. Expand the sweep to OS-level persistence."
+      },
+      {
+        "h": "第四步 清理与恢复",
+        "p": "删除 WebShell、还原被改文件（从版本库或发布包）、修复漏洞（本次的入口）、轮换所有可能暴露的凭据（数据库密码、API Key、会话密钥）。",
+        "h_en": "Step four: clean and recover",
+        "p_en": "Delete webshells, restore modified files from version control or release packages, fix the vulnerability that was the entry, and rotate every credential that may have been exposed (database passwords, API keys, session secrets)."
+      },
+      {
+        "h": "第五步 加固与验证",
+        "p": "上传目录禁止执行、文件写入隔离、WAF 规则补充本次载荷特征、增加文件完整性监控。验证：重放攻击载荷应被拦截；再跑一次第三步的排查确认无残留。",
+        "h_en": "Step five: harden and verify",
+        "p_en": "Disable execution in upload directories, isolate file writes, add WAF rules for this payload's signatures, and enable file integrity monitoring. Verify: replaying the payload should be blocked; rerun step three's sweep to confirm nothing remains."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Incident Response",
+        "url": "https://owasp.org/www-community/vulnerability_templates"
+      },
+      {
+        "name": "CISA Playbooks",
+        "url": "https://www.cisa.gov/resources-tools/resources/federal-government-cybersecurity-incident-and-vulnerability-response-playbooks"
+      }
+    ],
+    "tags": [
+      "应急响应",
+      "Web",
+      "实战"
+    ],
+    "quiz": [
+      {
+        "q": "从日志找入口时最值得关注的是？",
+        "options": [
+          "正常 GET 请求",
+          "异常编码的参数、命令执行特征、上传 POST",
+          "静态资源 200",
+          "首页访问量"
+        ],
+        "answer": 1,
+        "explain": "这些是自动化利用工具的典型指纹。",
+        "q_en": "What to look for when hunting the entry in logs?",
+        "options_en": [
+          "Normal GET requests",
+          "Anomalously encoded parameters, command execution markers, upload POSTs",
+          "Static 200s",
+          "Homepage traffic"
+        ],
+        "explain_en": "These are typical signatures of automated exploitation tools."
+      },
+      {
+        "q": "判断是否有 WebShell 最快的方式是？",
+        "options": [
+          "全盘杀毒",
+          "比对部署包与线上文件的差异",
+          "看 CPU 占用",
+          "重启服务"
+        ],
+        "answer": 1,
+        "explain": "差异比对能快速定位被改与被加的文件。",
+        "q_en": "Fastest way to detect a webshell?",
+        "options_en": [
+          "Full antivirus scan",
+          "Diff the deployment package against live files",
+          "Check CPU usage",
+          "Restart services"
+        ],
+        "explain_en": "Diffing quickly reveals modified and added files."
+      },
+      {
+        "q": "清理后必须做什么？",
+        "options": [
+          "重启服务器",
+          "轮换可能暴露的所有凭据",
+          "只改一个密码",
+          "写复盘报告"
+        ],
+        "answer": 1,
+        "explain": "攻击者可能已读走配置里的全部凭据。",
+        "q_en": "What must follow cleanup?",
+        "options_en": [
+          "Restart the server",
+          "Rotate every credential that may have been exposed",
+          "Change one password",
+          "Write a report"
+        ],
+        "explain_en": "Attackers may have read every credential in configuration."
+      },
+      {
+        "q": "WebShell 能执行命令意味着什么？",
+        "options": [
+          "只是页面被改",
+          "攻击者可能已提权到系统层，需向上排查",
+          "没有影响",
+          "只需删文件"
+        ],
+        "answer": 1,
+        "explain": "要从 Web 层扩展到系统层排查。",
+        "q_en": "A webshell executing commands implies?",
+        "options_en": [
+          "Only a page was defaced",
+          "The attacker may have escalated to OS level; expand the sweep",
+          "No impact",
+          "Just delete the file"
+        ],
+        "explain_en": "Expand from web to system layer."
+      }
+    ]
+  },
+  {
+    "id": "ir-comms",
+    "kind": "lesson",
+    "category": "应急响应",
+    "cwe": null,
+    "title": "通报与沟通：说清楚什么、不说什么",
+    "title_en": "Incident Communication",
+    "level": "intermediate",
+    "icon": "COMM",
+    "color": "ir",
+    "summary": "事件中的沟通对象至少有四种：技术团队、管理层、用户、监管方。同一件事，四种说法。",
+    "summary_en": "Four audiences—technical, management, users, regulators—need four different framings.",
+    "sections": [
+      {
+        "h": "对技术团队",
+        "p": "说细节、说证据、说缺口。明确谁负责哪一块（取证、遏制、修复、监控），避免多人重复操作同一主机。所有操作上线前先在群里说一句，避免互相覆盖。",
+        "h_en": "To the technical team",
+        "p_en": "Share details, evidence, and gaps. Assign ownership explicitly (forensics, containment, remediation, monitoring) to avoid multiple people operating on the same host. Announce every action in the channel before performing it."
+      },
+      {
+        "h": "对管理层",
+        "p": "说影响、说决策点、说时间预期。管理层不需要知道是哪个 CVE，需要知道「哪些业务受影响」「现在需要你批什么」「什么时候能恢复」。避免用技术术语淹没决策信息。",
+        "h_en": "To management",
+        "p_en": "Speak to impact, decision points, and expected timing. Management does not need the CVE number; they need which business is affected, what approval is needed, and when service returns. Avoid drowning decisions in jargon."
+      },
+      {
+        "h": "对用户",
+        "p": "说事实、说已采取的措施、说用户该做什么。不要隐瞒已经确认的影响（如数据泄露范围），也不要推测尚未确认的原因。措辞要经得起事后核对。",
+        "h_en": "To users",
+        "p_en": "State facts, measures taken, and what users should do. Do not conceal confirmed impact such as the scope of a data breach, and do not speculate on unconfirmed causes. Wording must survive later verification."
+      },
+      {
+        "h": "对监管方",
+        "p": "按法规要求的时间与格式通报。提前准备好模板：事件性质、影响范围、已采取措施、后续计划。不确定的项标注「调查中」，不要留空。",
+        "h_en": "To regulators",
+        "p_en": "Notify within legally required timeframes and formats. Prepare templates in advance: incident nature, impact scope, measures taken, next steps. Mark uncertain items as under investigation; never leave blanks."
+      },
+      {
+        "h": "一条纪律",
+        "p": "对外发布的内容必须经过统一出口，避免不同人给出矛盾的说法。内部也建议有单一信息源（如一个共享文档），所有人从那里取最新状态。",
+        "h_en": "One discipline",
+        "p_en": "External communication must have a single outlet to avoid contradictory statements. Internally, maintain a single source of truth (a shared document) that everyone reads for current status."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-61 Rev.2",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r2/final"
+      }
+    ],
+    "tags": [
+      "应急响应",
+      "沟通"
+    ],
+    "quiz": [
+      {
+        "q": "向管理层通报时应该侧重什么？",
+        "options": [
+          "CVE 编号与利用链细节",
+          "业务影响、需要决策的事项、恢复预期",
+          "日志字段名",
+          "代码行号"
+        ],
+        "answer": 1,
+        "explain": "管理层需要的是决策信息。",
+        "q_en": "What should management communication emphasize?",
+        "options_en": [
+          "CVE numbers and exploit chains",
+          "Business impact, decisions needed, recovery expectations",
+          "Log field names",
+          "Code line numbers"
+        ],
+        "explain_en": "Management needs decision information."
+      },
+      {
+        "q": "对用户通报时最需要注意？",
+        "options": [
+          "使用最专业的术语",
+          "措辞经得起事后核对，不推测未确认的原因",
+          "尽量简短",
+          "不提任何影响"
+        ],
+        "answer": 1,
+        "explain": "事后被推翻的说法会严重损害信任。",
+        "q_en": "What matters most when notifying users?",
+        "options_en": [
+          "The most technical terms",
+          "Wording that survives verification, without speculating on unconfirmed causes",
+          "Brevity",
+          "Omitting all impact"
+        ],
+        "explain_en": "Statements later overturned badly damage trust."
+      },
+      {
+        "q": "为什么内部要有单一信息源？",
+        "options": [
+          "方便统计",
+          "避免不同人给出矛盾说法",
+          "节省成本",
+          "流程要求"
+        ],
+        "answer": 1,
+        "explain": "信息不一致会让处置乱套。",
+        "q_en": "Why have a single internal source of truth?",
+        "options_en": [
+          "Easier statistics",
+          "Prevents contradictory statements from different people",
+          "Saves cost",
+          "Policy requires it"
+        ],
+        "explain_en": "Inconsistent information derails response."
+      },
+      {
+        "q": "监管通报中遇到尚不确定的项应该？",
+        "options": [
+          "留空",
+          "标注「调查中」，不要臆测",
+          "写「无影响」",
+          "推迟通报"
+        ],
+        "answer": 1,
+        "explain": "留空会被视为隐瞒。",
+        "q_en": "What to do with uncertain items in regulatory notices?",
+        "options_en": [
+          "Leave blank",
+          "Mark as under investigation; do not speculate",
+          "State no impact",
+          "Delay notification"
+        ],
+        "explain_en": "Blanks are read as concealment."
+      }
+    ]
+  },
+  {
+    "id": "ir-ransomware",
+    "kind": "lab",
+    "category": "应急响应",
+    "cwe": "CWE-400",
+    "title": "勒索软件事件处置要点",
+    "title_en": "Handling a Ransomware Incident",
+    "level": "advanced",
+    "icon": "RANS",
+    "color": "ir",
+    "summary": "勒索事件的关键判断不是「付不付钱」，而是「备份是否干净」和「攻击者是否还在内网」。",
+    "summary_en": "The key questions are whether backups are clean and whether attackers are still inside.",
+    "sections": [
+      {
+        "h": "第一判断：备份是否可信",
+        "p": "勒索攻击的典型手法是先删备份再加密。确认离线备份与异地备份是否完好，以及备份是否在攻击者可达范围内。如果备份也被加密，恢复方案必须另想。",
+        "h_en": "First judgment: are backups trustworthy",
+        "p_en": "Ransomware typically deletes backups before encrypting. Confirm offline and offsite backups are intact and whether they were within the attacker's reach. If backups were encrypted too, the recovery plan must differ."
+      },
+      {
+        "h": "第二判断：攻击者是否还在",
+        "p": "加密往往是最后一步。在此之前攻击者可能已驻留数周，建立了持久化、窃取了数据（双重勒索）。直接恢复系统而不清除驻留，会在恢复后再次被加密。",
+        "h_en": "Second judgment: is the attacker still inside",
+        "p_en": "Encryption is often the last step. Attackers may have dwelled for weeks, established persistence, and exfiltrated data (double extortion). Restoring without removing the foothold leads to re-encryption after recovery."
+      },
+      {
+        "h": "不要做的事",
+        "p": "不要在受害网络上搜索解密工具并直接运行（可能是二次载荷）；不要支付赎金后以为事情结束（约四成付款者仍被再次勒索）；不要在未取证的情况下重装（丢失攻击者线索与数据泄露证据）。",
+        "h_en": "What not to do",
+        "p_en": "Do not search for decryption tools on the compromised network and run them directly (they may be second-stage payloads); do not assume paying the ransom ends it (roughly 40 percent of payers are extorted again); do not reinstall without forensics (losing attacker clues and breach evidence)."
+      },
+      {
+        "h": "正确顺序",
+        "p": "隔离受影响网段 → 保全证据（尤其勒索说明文件、加密样本、日志）→ 评估备份 → 排查驻留 → 从干净备份重建 → 加固（备份隔离、最小权限、及时打补丁、开启多因素认证）。",
+        "h_en": "Correct order",
+        "p_en": "Isolate affected segments, preserve evidence (especially ransom notes, encrypted samples, and logs), assess backups, sweep for persistence, rebuild from clean backups, and harden (backup isolation, least privilege, prompt patching, MFA enabled)."
+      },
+      {
+        "h": "长期改进",
+        "p": "3-2-1 备份原则（三份副本、两种介质、一份离线）；备份恢复演练（没演练过的备份不算备份）；限制横向移动（分段、禁用来宾网络、限制管理协议的来源）。",
+        "h_en": "Long-term improvements",
+        "p_en": "Follow the 3-2-1 backup rule (three copies, two media types, one offline); rehearse restores (an untested backup is not a backup); limit lateral movement (segmentation, disable guest networking, restrict management protocol sources)."
+      }
+    ],
+    "refs": [
+      {
+        "name": "CISA StopRansomware Guide",
+        "url": "https://www.cisa.gov/stopransomware/ransomware-guide"
+      },
+      {
+        "name": "NIST SP 800-61 Rev.2",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r2/final"
+      }
+    ],
+    "tags": [
+      "勒索软件",
+      "应急响应"
+    ],
+    "quiz": [
+      {
+        "q": "勒索事件中最重要的两个判断是？",
+        "options": [
+          "付不付钱、报不报警",
+          "备份是否干净、攻击者是否还在内网",
+          "加密算法、密钥长度",
+          "损失金额、保险赔付"
+        ],
+        "answer": 1,
+        "explain": "这两点决定恢复方案是否可行。",
+        "q_en": "Two most important judgments in a ransomware event?",
+        "options_en": [
+          "Whether to pay, whether to report",
+          "Whether backups are clean, whether the attacker is still inside",
+          "Encryption algorithm, key length",
+          "Loss amount, insurance"
+        ],
+        "explain_en": "These determine whether the recovery plan is viable."
+      },
+      {
+        "q": "为什么不能在未取证时就重装？",
+        "options": [
+          "重装太慢",
+          "会丢失攻击者线索与数据泄露证据",
+          "重装失败率高",
+          "需要额外授权"
+        ],
+        "answer": 1,
+        "explain": "取证结果决定后续通报与法律责任判断。",
+        "q_en": "Why not reinstall before forensics?",
+        "options_en": [
+          "Reinstall is slow",
+          "It loses attacker clues and breach evidence",
+          "High failure rate",
+          "Needs authorization"
+        ],
+        "explain_en": "Forensics determines later reporting and legal judgment."
+      },
+      {
+        "q": "3-2-1 备份原则中的「1」指？",
+        "options": [
+          "一台服务器",
+          "一份离线副本",
+          "一年周期",
+          "一个管理员"
+        ],
+        "answer": 1,
+        "explain": "离线副本是抵御勒索的最后防线。",
+        "q_en": "In the 3-2-1 backup rule, what does 1 mean?",
+        "options_en": [
+          "One server",
+          "One offline copy",
+          "One year",
+          "One administrator"
+        ],
+        "explain_en": "The offline copy is the last line of defense against ransomware."
+      },
+      {
+        "q": "约四成支付赎金后仍被再次勒索，说明？",
+        "options": [
+          "支付没用",
+          "付款不能保证攻击者删除数据或停止攻击",
+          "赎金太贵",
+          "应该多付"
+        ],
+        "answer": 1,
+        "explain": "付款无法换取任何可靠承诺。",
+        "q_en": "Roughly 40 percent of payers are extorted again. This shows?",
+        "options_en": [
+          "Payment is useless",
+          "Payment guarantees neither deletion nor cessation",
+          "Ransom is too expensive",
+          "Pay more"
+        ],
+        "explain_en": "Payment buys no reliable commitment."
+      }
+    ]
+  }
+]

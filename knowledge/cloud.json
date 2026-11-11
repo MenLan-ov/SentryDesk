@@ -1,0 +1,1058 @@
+[
+  {
+    "id": "cloud-desktop-surface",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": null,
+    "title": "桌面应用的攻击面",
+    "title_en": "Desktop Application Attack Surface",
+    "level": "intermediate",
+    "icon": "DESK",
+    "color": "web",
+    "summary": "桌面应用把 Web 技术栈搬进本机，于是同时继承两边风险：前端可被注入，后端 IPC 通道又直通文件系统与命令行。",
+    "summary_en": "Desktop apps bring the web stack onto the local machine, inheriting both risk sets: injectable frontends and IPC channels wired into the filesystem and shell.",
+    "sections": [
+      {
+        "h": "和纯 Web 的本质区别",
+        "h_en": "How it differs from pure web",
+        "p": "浏览器里最坏情况是 XSS 拿到当前站点的会话；桌面应用里最坏情况是前端注入拿到本机任意文件读写与命令执行。差别不在漏洞类型，在爆炸半径。因此安全边界必须画在原生侧，而不是相信 WebView 里跑的任何代码。",
+        "p_en": "In a browser the worst case is XSS capturing one site session; in a desktop app the worst case is frontend injection gaining arbitrary local file access and command execution. The difference is not the vulnerability class but the blast radius. The boundary must sit on the native side.",
+        "code": []
+      },
+      {
+        "h": "IPC 是真正的关键边界",
+        "h_en": "IPC is the real boundary",
+        "p": "每个暴露给前端的 command 都相当于一个本地 API 端点。要问三个问题：调用方需要认证吗（本地应用通常没有，参数必须完全不可信）、参数是否用于拼接路径或命令、返回数据是否可能含敏感内容。任何一个答案是\"会\"，就必须在该 command 内部校验，不能靠前端先校验。",
+        "p_en": "Every command exposed to the frontend is a local API endpoint. Ask three questions: does the caller authenticate (usually not, so arguments are untrusted), are arguments used to build paths or commands, and could responses contain sensitive data. Any yes means validating inside that command.",
+        "code": [
+          {
+            "lang": "rust",
+            "title": "路径参数收敛到白名单目录",
+            "bad": "#[tauri::command]\nfn open_file(path: String) -> Result<String, String> {\n    // Uses whatever path the frontend sends\n    std::fs::read_to_string(path).map_err(|e| e.to_string())\n}",
+            "good": "#[tauri::command]\nfn open_file(app: tauri::AppHandle, name: String) -> Result<String, String> {\n    // Allowlist characters only, which inherently excludes separators and parent refs\n    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == . || c == - || c == _) {\n        return Err(\"illegal name\".into());\n    }\n    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;\n    let full = dir.join(&name);\n    // After normalization, confirm it is still inside the data dir to block symlink escapes\n    let canon = full.canonicalize().map_err(|e| e.to_string())?;\n    if !canon.starts_with(&dir) { return Err(\"out of scope\".into()); }\n    std::fs::read_to_string(canon).map_err(|e| e.to_string())\n}",
+            "note": "两层校验：先按字符白名单拒绝可疑输入，再对规范化后的真实路径做前缀确认",
+            "title_en": "Confine path arguments to an allowlisted directory",
+            "note_en": "Two layers: reject suspicious input by character allowlist, then confirm the normalized real path prefix"
+          }
+        ]
+      },
+      {
+        "h": "WebView 配置里的隐患",
+        "h_en": "WebView configuration hazards",
+        "p": "三个配置最容易出问题：关闭 CSP（应尽量开启并收敛 connect-src）、允许任意 URL 导航（恶意页面可借此加载外部内容）、发布版本仍启用 devtools。另外\"允许访问本地文件协议\"一旦打开，前端 XSS 就能直接读磁盘。原则是默认全关，按需最小开启。",
+        "p_en": "Three settings go wrong most often: disabling CSP (keep it and narrow connect-src), allowing arbitrary navigation, and shipping a release with devtools enabled. Enabling local-file protocol access turns frontend XSS into direct disk reads. Default everything off.",
+        "code": []
+      },
+      {
+        "h": "自动更新是被忽视的入口",
+        "h_en": "Auto-update: the neglected entry",
+        "p": "自动更新本质是\"从网络下载可执行文件并运行\"的通道。更新源被劫持或签名校验缺失，攻击者就能直接推一个恶意版本。最低要求：更新包必须验签、地址必须 HTTPS、且不允许用户跳过验签。没有签名基础设施时，至少公开每个版本的 SHA-256 供手工核对。",
+        "p_en": "An auto-updater downloads and executes a binary from the network. If the source can be hijacked or verification is missing, an attacker ships a malicious build. Minimum bar: signed packages, HTTPS, no user-facing bypass. Without signing infrastructure, publish a per-release SHA-256.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "Tauri Security",
+        "url": "https://tauri.app/security/"
+      },
+      {
+        "name": "OWASP Desktop App Security Top 10",
+        "url": "https://owasp.org/www-project-desktop-app-security-top-10/"
+      },
+      {
+        "name": "Electron Security Checklist",
+        "url": "https://www.electronjs.org/docs/latest/tutorial/security"
+      }
+    ],
+    "tags": [
+      "桌面应用",
+      "Tauri",
+      "IPC",
+      "攻击面"
+    ],
+    "quiz": [
+      {
+        "q": "桌面应用的安全边界应该画在哪里？",
+        "options": [
+          "WebView 内的 JavaScript",
+          "原生侧的 IPC 命令实现",
+          "操作系统的防火墙",
+          "用户的操作习惯"
+        ],
+        "answer": 1,
+        "explain": "前端代码一旦被注入就不可信，所有校验必须落在原生侧。",
+        "q_en": "Where should a desktop app draw its security boundary?",
+        "options_en": [
+          "JavaScript inside the WebView",
+          "The native implementation behind IPC commands",
+          "The OS firewall",
+          "User habits"
+        ],
+        "explain_en": "Once injected, frontend code is untrusted; all validation must land on the native side."
+      },
+      {
+        "q": "路径校验中，为什么按字符白名单比检查上级引用更稳？",
+        "options": [
+          "速度更快",
+          "白名单天然排除所有路径分隔符与特殊构造，减少绕过面",
+          "兼容性更好",
+          "能防住 SQL 注入"
+        ],
+        "answer": 1,
+        "explain": "黑名单永远在追新绕过写法，白名单只需列举合法字符。",
+        "q_en": "Why is a character whitelist more robust than checking parent references?",
+        "options_en": [
+          "It is faster",
+          "A whitelist inherently excludes separators and exotic constructs, shrinking the bypass surface",
+          "Better compatibility",
+          "It stops SQL injection"
+        ],
+        "explain_en": "A denylist chases new bypasses forever; a whitelist only enumerates legal characters."
+      },
+      {
+        "q": "自动更新机制最容易被忽略的要求是什么？",
+        "options": [
+          "更新频率",
+          "更新包签名校验且不可被用户绕过",
+          "更新日志长度",
+          "下载速度"
+        ],
+        "answer": 1,
+        "explain": "更新通道等同于远程代码执行通道，不验签等于把执行权交给网络。",
+        "q_en": "What is most often missed in auto-update design?",
+        "options_en": [
+          "Update frequency",
+          "Signature verification that users cannot bypass",
+          "Changelog length",
+          "Download speed"
+        ],
+        "explain_en": "An update channel is a code execution channel; skipping verification hands execution rights to the network."
+      }
+    ]
+  },
+  {
+    "id": "cloud-local-data",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": "CWE-311",
+    "title": "本地数据安全与静态加密",
+    "title_en": "Local Data Security and Encryption at Rest",
+    "level": "intermediate",
+    "icon": "LOCAL",
+    "color": "crypto",
+    "summary": "\"数据不出本机\"并不自动等于安全：本机其他进程、其他用户、以及被拷走的数据库文件，都是真实的泄露路径。",
+    "summary_en": "\"Data never leaves the machine\" is not automatically safe: other local processes, other users, and a copied database file are all real leak paths.",
+    "sections": [
+      {
+        "h": "本地存储的三类威胁",
+        "h_en": "Three classes of local threat",
+        "p": "一、同机其他进程读取，用户态文件默认对同账户进程完全可读。二、多用户环境下的越权读取，根因是数据目录权限过宽。三、备份与同步工具把数据库带出机器，比如网盘自动同步与系统备份。第三类最容易被忽视，因为泄露发生在用户完全无感的情况下。",
+        "p_en": "Three threats: other processes on the same machine reading the file, since user-level files are fully readable by same-account processes; cross-user reads when data directory permissions are too broad; and backup or sync tools carrying the database off the machine. The third is most often missed because it happens without the user noticing.",
+        "code": []
+      },
+      {
+        "h": "什么该加密，什么不必",
+        "h_en": "What to encrypt and what not",
+        "p": "不必加密的是公开采集的元数据，本来就是公开信息，加密只增加复杂度。必须加密的是个人笔记、内部关注列表、导出报告，因为它们反映\"你关心什么\"，在情报语境里这个信息本身就是敏感资产。判断标准不是\"数据重不重要\"，而是\"泄露后能否反推出你的意图\"。",
+        "p_en": "Do not encrypt public metadata; it is public by definition. Do encrypt personal notes, internal watchlists and exported reports, because they reveal what you care about, and in an intelligence context that interest is itself the sensitive asset. The test is not importance but whether a leak reveals your intent.",
+        "code": []
+      },
+      {
+        "h": "用系统凭据库而不是自己存密钥",
+        "h_en": "Use the OS credential store",
+        "p": "最常见也最糟糕的做法是把密钥硬编码在程序里或写进配置文件。正确做法是用操作系统提供的凭据存储，Windows 上是 DPAPI 或凭据管理器，macOS 是 Keychain，Linux 是 Secret Service，由系统按用户账户保护密钥。程序只持有句柄，不持有密钥本身。",
+        "p_en": "The worst common practice is hardcoding a key or writing it to a config file. Use the OS credential store instead: DPAPI or Credential Manager on Windows, Keychain on macOS, Secret Service on Linux. The system protects the key per user account, and the app holds only a handle.",
+        "code": [
+          {
+            "lang": "rust",
+            "title": "用 keyring 存密钥而不是写文件",
+            "bad": "const KEY: &str = \"a1b2c3d4e5f6...\";   // compiled in; strings reveals it\nfs::write(\"key.txt\", KEY)?;            // or stored in plaintext in a config file",
+            "good": "use keyring::Entry;\n\nfn get_or_create_key() -> keyring::Result<Entry> {\n    let e = Entry::new(\"SentryDesk\", \"db-key\")?;\n    if e.get_password().is_err() {\n        // Generate a random key on first run and hand it to the OS keystore\n        let mut buf = [0u8; 32];\n        getrandom::getrandom(&mut buf).unwrap();\n        use base64::Engine;\n        let b64 = base64::engine::general_purpose::STANDARD.encode(buf);\n        e.set_password(&b64)?;\n    }\n    Ok(e)\n}",
+            "note": "密钥由系统按登录账户保护，其他用户或其他机器上的副本无法解开",
+            "title_en": "Store the key in keyring, not a file",
+            "note_en": "The OS protects the key per login account; copies elsewhere cannot decrypt it"
+          }
+        ]
+      },
+      {
+        "h": "导出与备份必须显式提醒",
+        "h_en": "Export and backup need explicit warnings",
+        "p": "只要程序提供导出和备份功能，就等于提供了把加密数据变成明文的手段。设计上要做两件事：导出内容默认最小化，只含元数据与链接不含正文；导出时明确提示该文件未加密，请妥善保管。静默导出全量数据是设计缺陷，不是功能。",
+        "p_en": "Any export or backup feature is a route to turn encrypted data back into plaintext. Minimize exported content by default (metadata and links only, no body text), and state clearly at export time that the file is unencrypted. Silently exporting everything is a design defect.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE-311: Missing Encryption of Sensitive Data",
+        "url": "https://cwe.mitre.org/data/definitions/311.html"
+      },
+      {
+        "name": "keyring crate",
+        "url": "https://crates.io/crates/keyring"
+      },
+      {
+        "name": "Windows DPAPI",
+        "url": "https://learn.microsoft.com/en-us/windows/win32/seccng/cng-dpapi"
+      }
+    ],
+    "tags": [
+      "本地安全",
+      "加密",
+      "凭据存储",
+      "隐私"
+    ],
+    "quiz": [
+      {
+        "q": "判断一份本地数据是否需要静态加密，最合理的标准是？",
+        "options": [
+          "文件大小",
+          "泄露后是否能反推出使用者的意图或关注点",
+          "是否包含中文",
+          "数据库行数"
+        ],
+        "answer": 1,
+        "explain": "公开元数据加密无收益；关注列表和笔记反映意图，才是真正的敏感面。",
+        "q_en": "What is the soundest criterion for whether local data needs encryption at rest?",
+        "options_en": [
+          "File size",
+          "Whether a leak reveals the user intent or interests",
+          "Whether it contains non-ASCII text",
+          "Row count"
+        ],
+        "explain_en": "Encrypting public metadata yields nothing; watchlists and notes reveal intent and are the real sensitive surface."
+      },
+      {
+        "q": "密钥最不应该放在哪里？",
+        "options": [
+          "操作系统凭据库",
+          "硬编码在程序或明文配置文件里",
+          "用户登录后解锁的内存",
+          "系统密钥链"
+        ],
+        "answer": 1,
+        "explain": "硬编码的密钥用 strings 就能提取，等于没有加密。",
+        "q_en": "Where must a key never live?",
+        "options_en": [
+          "The OS credential store",
+          "Hardcoded in the binary or a plaintext config file",
+          "Memory unlocked after user login",
+          "The system keychain"
+        ],
+        "explain_en": "A hardcoded key is extractable with strings; it is equivalent to no encryption."
+      },
+      {
+        "q": "导出功能的安全设计要点是什么？",
+        "options": [
+          "导出越多越好",
+          "默认最小化内容，并明确提示文件未加密",
+          "导出后自动删除原数据",
+          "只在夜间允许导出"
+        ],
+        "answer": 1,
+        "explain": "导出是加密数据转明文的通道，必须在内容范围和提示上同时收紧。",
+        "q_en": "What is the key security design point for export?",
+        "options_en": [
+          "Export as much as possible",
+          "Minimize content by default and warn that the file is unencrypted",
+          "Delete source data after export",
+          "Allow export only at night"
+        ],
+        "explain_en": "Export converts encrypted data to plaintext, so tighten both scope and warning."
+      }
+    ]
+  },
+  {
+    "id": "cloud-ssrf-meta",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": "CWE-918",
+    "title": "云元数据服务与 SSRF",
+    "title_en": "Cloud Metadata Service and SSRF",
+    "level": "advanced",
+    "icon": "META",
+    "color": "web",
+    "summary": "云主机上有个仅本机可达的内部地址，能直接换取实例的临时凭据。任何\"让服务器去取一个 URL\"的功能，都可能成为通往它的跳板。",
+    "summary_en": "Cloud hosts expose a link-local address that hands out instance credentials. Any feature that fetches a user-supplied URL can become a pivot to it.",
+    "sections": [
+      {
+        "h": "为什么这个地址如此危险",
+        "h_en": "Why this address is so dangerous",
+        "p": "主流云厂商在 169.254.169.254 上提供实例元数据服务，无需认证即可访问，返回内容包括实例 ID、所属角色、以及可换取云 API 权限的临时令牌。攻击者只要能让服务器发起一次对该地址的请求并把响应带回来，就完成了从\"一个 Web 漏洞\"到\"云账户权限\"的跨越。历史上多起重大泄露都走这条路。",
+        "p_en": "Major cloud providers expose instance metadata on 169.254.169.254, reachable without authentication, returning instance identity, attached role, and temporary tokens exchangeable for cloud API rights. If an attacker can make the server issue one request there and reflect the response, they escalate from a web bug to cloud account access.",
+        "code": []
+      },
+      {
+        "h": "SSRF 的识别要点",
+        "h_en": "Recognizing SSRF",
+        "p": "凡是\"用户提供 URL、域名、图片地址、webhook 地址\"的地方都要怀疑。判断不能只看字符串是否匹配内网前缀，要防住十进制 IP、IPv6 映射形式、DNS 重绑定（第一次解析到公网、第二次解析到内网）、以及 302 跳转。正确做法是解析出 IP 后按地址段判断，并在每一跳重定向后重新校验。",
+        "p_en": "Suspect anywhere a user supplies a URL, hostname, image address or webhook. Do not rely on string prefix matching: defend against decimal IPs, IPv6-mapped forms, DNS rebinding (public on first lookup, private on second), and redirects. Resolve to an IP, judge by address block, re-validate after every hop.",
+        "code": [
+          {
+            "lang": "rust",
+            "title": "按解析后的 IP 判断，而不是按字符串",
+            "bad": "fn is_safe(url: &str) -> bool {\n    // Blocks only the most naive form\n    !url.contains(\"169.254\") && !url.contains(\"127.0.0.1\")\n}",
+            "good": "fn is_safe_ip(ip: std::net::IpAddr) -> bool {\n    match ip {\n        std::net::IpAddr::V4(v4) => {\n            !(v4.is_loopback()\n              || v4.is_private()\n              || v4.is_link_local()      // 169.254.0.0/16, home of the metadata address\n              || v4.is_broadcast()\n              || v4.is_unspecified())\n        }\n        std::net::IpAddr::V6(v6) => {\n            !(v6.is_loopback() || v6.is_unspecified())\n            // Also handle ::ffff: mapping and ULA fc00::/7 separately\n        }\n    }\n}",
+            "note": "判断发生在解析结果上，重定向的每一跳都要重新调用一次",
+            "title_en": "Judge the resolved IP, not the string",
+            "note_en": "The decision applies to the resolved result and must be repeated after every redirect hop"
+          }
+        ]
+      },
+      {
+        "h": "纵深防御不止一层",
+        "h_en": "Defense in depth",
+        "p": "光靠应用层校验不够，还要叠加三层：云侧强制元数据服务使用会话令牌（IMDSv2 这类机制），让无令牌请求直接失败；给实例角色最小权限，即使凭据被取走也只能做很少的事；把出网流量收敛到白名单代理。任意一层生效都能阻断这条链，这就是纵深防御的实际含义。",
+        "p_en": "Application checks are not enough. Layer on: enforced session-token metadata access (IMDSv2-style) so tokenless requests fail; minimal instance role permissions so stolen credentials do little; and egress through an allowlisted proxy. Any one layer breaking the chain is what defense in depth means in practice.",
+        "code": []
+      },
+      {
+        "h": "对本项目的启示",
+        "h_en": "Implications for this project",
+        "p": "一个\"输入 URL 就帮你取内容\"的本地工具，同样具备 SSRF 的形状：它可能被用来访问内网服务或本机管理端口。因此采集器应当做三件事：把允许访问的域写死成白名单而不是黑名单、拒绝一切私有地址与回环地址、对每一跳重定向重新校验目标。这三条也是本项目合规采集边界的技术落地。",
+        "p_en": "A local tool that fetches whatever URL you give it has the same SSRF shape: it can be aimed at intranet services or local admin ports. The collector should pin an allowlist of domains rather than a denylist, reject all private and loopback addresses, and re-validate after every redirect.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP SSRF Prevention Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"
+      },
+      {
+        "name": "CWE-918: Server-Side Request Forgery",
+        "url": "https://cwe.mitre.org/data/definitions/918.html"
+      },
+      {
+        "name": "AWS IMDS documentation",
+        "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html"
+      }
+    ],
+    "tags": [
+      "SSRF",
+      "云安全",
+      "元数据",
+      "内网"
+    ],
+    "quiz": [
+      {
+        "q": "为什么 SSRF 能造成从 Web 漏洞到云账户失守的跨越？",
+        "options": [
+          "因为云主机性能更强",
+          "因为元数据地址无需认证即可换取实例的临时凭据",
+          "因为云厂商不打补丁",
+          "因为云主机默认关闭防火墙"
+        ],
+        "answer": 1,
+        "explain": "链路是：让服务器访问元数据地址，取回临时令牌，再调用云 API。",
+        "q_en": "Why can SSRF escalate from a web bug to cloud account compromise?",
+        "options_en": [
+          "Cloud hosts are faster",
+          "The metadata address hands out temporary instance credentials without authentication",
+          "Cloud vendors do not patch",
+          "Cloud hosts disable firewalls"
+        ],
+        "explain_en": "The chain is: make the server reach the metadata address, retrieve a token, call cloud APIs."
+      },
+      {
+        "q": "判断目标地址是否安全，正确做法是？",
+        "options": [
+          "匹配字符串里有没有 127.0.0.1",
+          "解析成 IP 后按地址段判断，并在每次重定向后重新校验",
+          "检查 URL 长度",
+          "要求用户签承诺书"
+        ],
+        "answer": 1,
+        "explain": "字符串匹配挡不住十进制 IP、IPv6 映射与 DNS 重绑定，必须看解析结果。",
+        "q_en": "What is the correct way to judge whether a target address is safe?",
+        "options_en": [
+          "Match the string for 127.0.0.1",
+          "Resolve to an IP, judge by address block, and re-validate after each redirect",
+          "Check URL length",
+          "Have the user sign a promise"
+        ],
+        "explain_en": "String matching misses decimal IPs, IPv6-mapped forms and DNS rebinding; inspect the resolved address."
+      },
+      {
+        "q": "强制元数据服务使用会话令牌的作用是什么？",
+        "options": [
+          "加快取数据速度",
+          "使无令牌的简单请求直接失败，阻断最典型的利用链路",
+          "降低存储成本",
+          "替代防火墙"
+        ],
+        "answer": 1,
+        "explain": "攻击者必须先拿令牌，一条简单链路变成需要多步的链路。",
+        "q_en": "What does enforcing session tokens on the metadata service achieve?",
+        "options_en": [
+          "Faster retrieval",
+          "Tokenless simple requests fail outright, blocking the most typical exploit chain",
+          "Lower storage cost",
+          "It replaces a firewall"
+        ],
+        "explain_en": "The attacker needs a token first, turning a one-step chain into a multi-step one."
+      }
+    ]
+  },
+  {
+    "id": "cloud-iam-least",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": "CWE-269",
+    "title": "最小权限与过度授权",
+    "title_en": "Least Privilege and Over-Permission",
+    "level": "beginner",
+    "icon": "IAM",
+    "color": "access",
+    "summary": "大多数云上失守不是因为利用技术高超，而是因为一个只需读某个存储桶的服务，被授予了整个账户的管理员权限。",
+    "summary_en": "Most cloud compromises are not clever exploits: a service that only needed to read one bucket was granted account-wide admin.",
+    "sections": [
+      {
+        "h": "过度授权是怎么长出来的",
+        "h_en": "How over-permission grows",
+        "p": "典型演化路径：开发阶段为了\"先跑通\"给了一个很宽的策略，上线时没人回头收敛，之后所有人照着这份策略抄。半年后没人敢动它，因为\"不知道哪些还在用\"。授权宽松是技术债的一种，而且它不像崩溃那样会立刻暴露。",
+        "p_en": "Typical evolution: a broad policy is granted to get things working, nobody narrows it before launch, everyone copies it afterward. Six months later nobody dares change it because usage is unknown. Loose authorization is technical debt that never announces itself the way a crash does.",
+        "code": []
+      },
+      {
+        "h": "三个立刻能做的收敛动作",
+        "h_en": "Three actions you can take today",
+        "p": "一、把通配符资源改成具体 ARN，这一条通常能消掉大半风险。二、把管理类动作与数据类动作拆到不同角色，读服务不给写权限。三、删掉长期访问密钥，改用角色与短期令牌。这三条不需要架构改造，一天内可完成。",
+        "p_en": "Replace wildcard resources with specific ARNs, which usually removes most of the risk; split management actions from data actions into separate roles so read services cannot write; and delete long-lived access keys in favor of roles and short-lived tokens. None needs re-architecture; all fit in a day.",
+        "code": [
+          {
+            "lang": "json",
+            "title": "从通配符收敛到具体资源与动作",
+            "bad": "{\n  \"Effect\": \"Allow\",\n  \"Action\": \"*\",\n  \"Resource\": \"*\"\n}",
+            "good": "{\n  \"Effect\": \"Allow\",\n  \"Action\": [\n    \"s3:GetObject\",\n    \"s3:ListBucket\"\n  ],\n  \"Resource\": [\n    \"arn:aws:s3:::reports-bucket\",\n    \"arn:aws:s3:::reports-bucket/*\"\n  ]\n}",
+            "note": "只读、只这一个桶；即使凭据泄露，损失面被锁死在只读范围内",
+            "title_en": "Narrow wildcards to specific actions and resources",
+            "note_en": "Read-only and one bucket: even a leaked credential is confined to reads"
+          }
+        ]
+      },
+      {
+        "h": "怎么发现\"谁还在用这个权限\"",
+        "h_en": "Finding who still uses a permission",
+        "p": "不要靠猜。云平台一般提供服务端访问日志或权限使用分析能力，跑 30 天就能列出\"授予了但从未使用\"的权限。基于真实调用记录做收敛，比人工评审准确得多，也更容易说服人。没有这类能力时，退而用应用日志统计实际调用过的 API 列表。",
+        "p_en": "Do not guess. Cloud platforms usually offer access logs or permission-usage analysis that, over 30 days, list granted-but-never-used permissions. Narrowing on real call records is far more accurate than manual review and much easier to defend. Otherwise derive the API list from application logs.",
+        "code": []
+      },
+      {
+        "h": "和本项目的关联",
+        "h_en": "How this applies to this project",
+        "p": "这个原则对本地工具同样成立：数据库访问不应存在执行任意 SQL 的能力路径、采集器只应访问白名单域名、导出功能只应写用户指定的目录。把\"程序需要什么\"写成一张最小能力清单，是设计阶段就该做的动作，而不是出事后的补救。",
+        "p_en": "The principle applies to local tools: the database layer should not expose arbitrary SQL execution, the collector should only reach allowlisted domains, and export should only write to a user-chosen directory. Writing the minimum capability list during design beats post-incident remediation.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE-269: Improper Privilege Management",
+        "url": "https://cwe.mitre.org/data/definitions/269.html"
+      },
+      {
+        "name": "OWASP Authorization Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+      },
+      {
+        "name": "NIST SP 800-53 AC-6 Least Privilege",
+        "url": "https://csf.tools/reference/nist-sp-800-53/r5/ac/ac-6/"
+      }
+    ],
+    "tags": [
+      "权限",
+      "云安全",
+      "IAM",
+      "最小权限"
+    ],
+    "quiz": [
+      {
+        "q": "云环境过度授权最典型的形态是什么？",
+        "options": [
+          "密码太短",
+          "服务账户被授予通配符动作与资源的宽策略",
+          "未开启双因素",
+          "未使用 HTTPS"
+        ],
+        "answer": 1,
+        "explain": "动作与资源同时通配，让一次凭据泄露就等于账户失守。",
+        "q_en": "What is the most typical shape of cloud over-permission?",
+        "options_en": [
+          "Short passwords",
+          "A service account holding a wildcard policy on actions and resources",
+          "No MFA",
+          "No HTTPS"
+        ],
+        "explain_en": "Wildcarding both action and resource makes one credential leak equivalent to account compromise."
+      },
+      {
+        "q": "要科学地收敛权限，最可靠的依据是什么？",
+        "options": [
+          "凭直觉删掉看起来不用的权限",
+          "基于 30 天真实调用日志识别授予但从未使用的权限",
+          "照抄同行的策略",
+          "让所有服务共用同一角色"
+        ],
+        "answer": 1,
+        "explain": "真实调用记录能给出可验证依据，也更容易在评审中站得住。",
+        "q_en": "What is the most reliable basis for narrowing permissions?",
+        "options_en": [
+          "Intuition about what looks unused",
+          "Thirty days of real call logs identifying granted-but-never-used permissions",
+          "Copying a peer policy",
+          "Sharing one role across all services"
+        ],
+        "explain_en": "Real call records give verifiable evidence and hold up in review."
+      },
+      {
+        "q": "读服务应不应该拥有写权限？",
+        "options": [
+          "应该，方便扩展",
+          "不应该，读写应拆分到不同角色",
+          "取决于语言",
+          "取决于数据量"
+        ],
+        "answer": 1,
+        "explain": "权限拆分后，即使读服务被攻破，攻击者也无法篡改或删除数据。",
+        "q_en": "Should a read service hold write permissions?",
+        "options_en": [
+          "Yes, for flexibility",
+          "No, read and write belong to separate roles",
+          "Depends on the language",
+          "Depends on data volume"
+        ],
+        "explain_en": "With the split, compromising the read service still cannot modify or delete data."
+      }
+    ]
+  },
+  {
+    "id": "cloud-container",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": "CWE-250",
+    "title": "容器与镜像安全基础",
+    "title_en": "Container and Image Security Basics",
+    "level": "intermediate",
+    "icon": "CTR",
+    "color": "harden",
+    "summary": "容器不是安全边界，它只是进程隔离的一种便利封装。镜像里留下的构建凭据、以 root 运行、过大的基础镜像，是最常见的三个问题。",
+    "summary_en": "A container is not a security boundary, only a convenient process-isolation wrapper. Build credentials baked into images, root execution, and oversized base images are the three most common problems.",
+    "sections": [
+      {
+        "h": "镜像里的历史会一直留着",
+        "h_en": "Image history is permanent",
+        "p": "Dockerfile 的每一层都会被保留。你在某一层 COPY 了密钥、下一层再删掉，密钥仍然存在于镜像历史中，任何能拉取镜像的人都能提取出来。正确做法是用多阶段构建，让构建阶段的文件根本不进入最终镜像；或者用构建期 secret 挂载而不是 COPY。",
+        "p_en": "Every Dockerfile layer is retained. If you COPY a key in one layer and delete it in the next, the key still lives in image history and anyone who can pull the image can extract it. Use multi-stage builds so build-time files never enter the final image, or mount build secrets instead of COPYing them.",
+        "code": [
+          {
+            "lang": "dockerfile",
+            "title": "多阶段构建，把工具链与凭据挡在最终镜像外",
+            "bad": "FROM node:20\nCOPY . .\nCOPY .npmrc /root/.npmrc      # may contain a token and stays in the layer forever\nRUN npm ci && npm run build\nRUN rm /root/.npmrc           # deleting it does nothing; the previous layer keeps it",
+            "good": "# Build stage\nFROM node:20 AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci\nCOPY . .\nRUN npm run build\n\n# Runtime stage: artifacts only\nFROM gcr.io/distroless/nodejs20-debian12\nWORKDIR /app\nCOPY --from=build /app/dist ./dist\nUSER nonroot\nCMD [\"dist/main.js\"]",
+            "note": "最终镜像里既没有 .npmrc，也没有编译器与源码，攻击面显著缩小",
+            "title_en": "Multi-stage build keeps toolchain and secrets out of the final image",
+            "note_en": "The final image has no .npmrc, no compiler and no source, shrinking the attack surface"
+          }
+        ]
+      },
+      {
+        "h": "为什么不要以 root 运行",
+        "h_en": "Why not run as root",
+        "p": "容器内 root 与宿主机 root 不是同一个东西，但一旦出现容器逃逸类漏洞，容器内 root 会显著降低利用门槛。同时以 root 运行的进程能修改镜像内任意文件，让不可变基础设施的假设失效。标准做法是创建非特权用户并在 Dockerfile 末尾切换，同时在编排层禁止提权。",
+        "p_en": "Container root is not host root, but when an escape-class vulnerability appears, root inside the container meaningfully lowers the exploitation bar. A root process can also modify any file in the image, breaking immutability. Create an unprivileged user, switch at the end of the Dockerfile, and forbid privilege escalation in the orchestrator.",
+        "code": []
+      },
+      {
+        "h": "镜像扫描要看什么",
+        "h_en": "What to look for in image scanning",
+        "p": "扫描结果里的\"高危数量\"几乎没有决策价值，因为基础镜像的 OS 包漏洞大多不可达。真正要看三件事：修复版本已发布但仍未升级的包、运行时真正加载的依赖里有无可利用漏洞、镜像里是否含有不该有的东西（私钥、调试工具、shell）。后者往往比漏洞数量更能反映真实风险。",
+        "p_en": "A raw high-severity count has almost no decision value because most OS package findings in a base image are unreachable. Look at three things: packages still unpatched where a fix exists; exploitable vulnerabilities among dependencies loaded at runtime; and whether the image contains what it should not (private keys, debug tools, a shell).",
+        "code": []
+      },
+      {
+        "h": "务实的最小基线",
+        "h_en": "A pragmatic minimum baseline",
+        "p": "如果只能做五件事：用精简基础镜像（distroless 或 alpine）、多阶段构建、非 root 运行、根文件系统只读（需要写的目录单独挂载）、固定基础镜像的 digest 而不是 tag。五条加起来通常不到半天，能消除容器场景里比例最高的一批问题。",
+        "p_en": "If you can only do five things: a minimal base image (distroless or alpine), multi-stage builds, non-root execution, a read-only root filesystem with writable mounts, and pinning base images by digest rather than tag. Usually under half a day and it removes the largest share of container risk.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CIS Docker Benchmark",
+        "url": "https://www.cisecurity.org/benchmark/docker"
+      },
+      {
+        "name": "NIST SP 800-190 Container Security",
+        "url": "https://csrc.nist.gov/pubs/sp/800/190/final"
+      },
+      {
+        "name": "CWE-250: Execution with Unnecessary Privileges",
+        "url": "https://cwe.mitre.org/data/definitions/250.html"
+      }
+    ],
+    "tags": [
+      "容器",
+      "镜像",
+      "云原生",
+      "加固"
+    ],
+    "quiz": [
+      {
+        "q": "在 Dockerfile 的某一层 COPY 了密钥并在下一层删除，密钥是否安全？",
+        "options": [
+          "安全，已经删掉了",
+          "不安全，层历史仍然保留原始内容",
+          "取决于是否 squash",
+          "取决于镜像是否公开"
+        ],
+        "answer": 1,
+        "explain": "镜像层是叠加的，删除只是新增一个白化条目，原内容仍在历史里。",
+        "q_en": "Is a key safe if COPYed in one layer and deleted in the next?",
+        "options_en": [
+          "Safe, it was deleted",
+          "Unsafe, layer history retains the original content",
+          "Depends on squashing",
+          "Depends on whether the image is public"
+        ],
+        "explain_en": "Layers are additive; deletion adds a whiteout entry while the original bytes remain."
+      },
+      {
+        "q": "镜像扫描结果里，哪一类信息最有决策价值？",
+        "options": [
+          "高危漏洞总数量",
+          "镜像内是否存在私钥、调试工具或不该有的 shell",
+          "镜像拉取耗时",
+          "层数"
+        ],
+        "answer": 1,
+        "explain": "基础镜像的 OS 包漏洞大多不可达，不该有的文件往往直接对应可利用路径。",
+        "q_en": "Which finding carries the most decision value in an image scan?",
+        "options_en": [
+          "Total high-severity count",
+          "Presence of private keys, debug tools or an unexpected shell",
+          "Pull time",
+          "Layer count"
+        ],
+        "explain_en": "Most base-image OS findings are unreachable; misplaced files usually map directly to an exploitable path."
+      },
+      {
+        "q": "固定基础镜像时应该固定什么？",
+        "options": [
+          "tag 名称，如 latest",
+          "镜像 digest",
+          "镜像大小",
+          "作者名"
+        ],
+        "answer": 1,
+        "explain": "tag 可被重新指向不同内容，digest 对应唯一内容，不可变。",
+        "q_en": "What should you pin when referencing a base image?",
+        "options_en": [
+          "A tag such as latest",
+          "The image digest",
+          "The image size",
+          "The author name"
+        ],
+        "explain_en": "Tags can be repointed; a digest maps to exactly one immutable content."
+      }
+    ]
+  },
+  {
+    "id": "cloud-keymgmt",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": "CWE-321",
+    "title": "密钥管理的四个基本动作",
+    "title_en": "Four Essentials of Key Management",
+    "level": "intermediate",
+    "icon": "KMS",
+    "color": "crypto",
+    "summary": "绝大多数密钥事故不是算法被攻破，而是密钥被放错地方、被复制太多份、或者从来没有轮换过。",
+    "summary_en": "Almost no key incident comes from a broken algorithm; they come from keys stored in the wrong place, copied too many times, or never rotated.",
+    "sections": [
+      {
+        "h": "动作一：集中存放，程序不持有明文",
+        "h_en": "Centralize, never hold plaintext",
+        "p": "密钥应存在专门的密钥管理服务或系统凭据库里，应用通过身份换取短期使用权限，这样\"程序里有没有密钥\"这个问题就消失了。反例是环境变量：它会被子进程继承、被崩溃转储带出、也常被框架打进日志。",
+        "p_en": "Keys belong in a key management service or OS credential store, with applications exchanging identity for short-lived usage rights, which removes the question of whether the program contains a key. The anti-pattern is environment variables, inherited by child processes, captured in crash dumps, and often logged.",
+        "code": []
+      },
+      {
+        "h": "动作二：按用途分离",
+        "h_en": "Separate by purpose",
+        "p": "加密密钥与签名密钥必须分开，因为泄露后果不同、轮换节奏也不同。每个环境、每个服务使用独立密钥。理由很实际：密钥共用时，轮换必须同时协调所有使用方，于是没人敢轮换，共用最终导致永不轮换。",
+        "p_en": "Separate encryption keys from signing keys: different leak consequences, different rotation cadence. Give each environment and service its own key. Shared keys force coordination across every consumer during rotation, so nobody rotates, and sharing produces never-rotating keys.",
+        "code": []
+      },
+      {
+        "h": "动作三：轮换必须有演练过的流程",
+        "h_en": "Rotation must be drilled",
+        "p": "轮换方案写在文档里但从未执行，等于没有。判断标准很简单：能否在不停止服务的情况下完成一次轮换？如果不能，说明系统对单一密钥存在硬依赖，需要先解决依赖结构。建议每季度真跑一次，当作消防演练。",
+        "p_en": "A documented but never executed rotation plan does not exist. The test: can you rotate once without stopping service? If not, the system has a hard dependency on one key and that structure must be fixed first. Run a real rotation quarterly as a fire drill.",
+        "code": [
+          {
+            "lang": "rust",
+            "title": "支持多版本密钥的验证逻辑",
+            "bad": "// One key only, so rotation requires downtime\nif verify(sig, &KEY_V1) { ok() } else { reject() }",
+            "good": "// Keep both keys, try both on verify, sign only with the newest\nfn verify_any(sig: &[u8], data: &[u8]) -> bool {\n    [&KEY_V2, &KEY_V1].iter().any(|k| verify(sig, data, k))\n}\nfn sign(data: &[u8]) -> Vec<u8> {\n    sign_with(data, &KEY_V2)   // new signatures always use the newest version\n}",
+            "note": "先发布支持双密钥的版本，再切换签发，最后下线旧密钥，三步都不停机",
+            "title_en": "Verification logic supporting key rotation",
+            "note_en": "Ship dual-key support, switch signing, then retire the old key — no downtime at any step"
+          }
+        ]
+      },
+      {
+        "h": "动作四：泄露响应要有固定顺序",
+        "h_en": "A fixed leak response order",
+        "p": "发现密钥泄露后的动作顺序应该是确定的：立即轮换而不是先调查，然后评估使用记录确定影响范围，再决定是否通知。顺序颠倒很常见，团队先花两天调查，密钥在这两天里仍然有效。\"先止损后归因\"写进流程，比事后总结有用。",
+        "p_en": "The order after a leak should be fixed: rotate immediately rather than investigating first, then assess usage records to bound impact, then decide on notification. Reversing it is common: teams spend two days investigating while the key stays valid. Contain first, attribute second.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE-321: Use of Hard-coded Cryptographic Key",
+        "url": "https://cwe.mitre.org/data/definitions/321.html"
+      },
+      {
+        "name": "OWASP Secrets Management Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html"
+      },
+      {
+        "name": "NIST SP 800-57 Key Management",
+        "url": "https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final"
+      }
+    ],
+    "tags": [
+      "密钥",
+      "加密",
+      "运维",
+      "轮换"
+    ],
+    "quiz": [
+      {
+        "q": "为什么不建议把密钥放在环境变量里？",
+        "options": [
+          "读取速度慢",
+          "会被子进程继承、崩溃转储带出，也常被框架打进日志",
+          "环境变量长度有限",
+          "不支持特殊字符"
+        ],
+        "answer": 1,
+        "explain": "环境变量的可见范围远大于直觉，属于高频泄露渠道。",
+        "q_en": "Why is storing keys in environment variables discouraged?",
+        "options_en": [
+          "Slow to read",
+          "Inherited by child processes, captured in crash dumps, often logged",
+          "Length is limited",
+          "Special characters unsupported"
+        ],
+        "explain_en": "Environment variables are visible in far more places than intuition suggests."
+      },
+      {
+        "q": "加密密钥与签名密钥为什么要分开？",
+        "options": [
+          "因为算法不同",
+          "因为泄露后果与轮换节奏不同，共用会导致没人敢轮换",
+          "因为性能要求不同",
+          "因为法规强制"
+        ],
+        "answer": 1,
+        "explain": "共用的直接后果是轮换成本过高，最终演变为永不轮换。",
+        "q_en": "Why separate encryption keys from signing keys?",
+        "options_en": [
+          "Different algorithms",
+          "Different leak consequences and cadence; sharing makes rotation too costly to attempt",
+          "Different performance needs",
+          "Regulation requires it"
+        ],
+        "explain_en": "Sharing makes rotation expensive enough that teams stop rotating altogether."
+      },
+      {
+        "q": "发现密钥泄露后第一个动作应该是什么？",
+        "options": [
+          "先花时间调查泄露路径",
+          "立即轮换止损",
+          "通知所有客户",
+          "重装系统"
+        ],
+        "answer": 1,
+        "explain": "调查期间密钥仍然有效，止损必须先于归因。",
+        "q_en": "What is the first action after discovering a key leak?",
+        "options_en": [
+          "Investigate the path first",
+          "Rotate immediately to contain damage",
+          "Notify all customers",
+          "Reinstall the system"
+        ],
+        "explain_en": "The key stays valid during investigation; containment must precede attribution."
+      }
+    ]
+  },
+  {
+    "id": "cloud-offline-design",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": null,
+    "title": "离线优先应用的安全设计",
+    "title_en": "Security Design for Offline-First Apps",
+    "level": "intermediate",
+    "icon": "OFF",
+    "color": "assess",
+    "summary": "离线优先意味着所有核心功能断网可用，这带来一个常被忽略的好处：攻击面天然收窄，因为运行时不存在依赖的远程服务。",
+    "summary_en": "Offline-first means every core feature works without a network, which brings an often-missed benefit: a naturally smaller attack surface with no runtime remote services.",
+    "sections": [
+      {
+        "h": "离线优先改变了什么",
+        "h_en": "What offline-first changes",
+        "p": "传统 Web 应用在运行时持续与后端交互，攻击者可以通过网络层发起攻击。离线优先应用的运行时没有服务端组件，网络只在用户主动触发的数据更新时短暂出现。这让攻击窗口从持续开放变成用户主动打开的几秒。这个结构性差异比任何单个防护措施都更重要。",
+        "p_en": "Conventional web apps interact with a backend continuously, so attackers can act over the network. An offline-first app has no server component at runtime; the network appears only briefly during user-initiated updates. The attack window shrinks from always-open to a few user-triggered seconds. That structural difference matters more than any single control.",
+        "code": []
+      },
+      {
+        "h": "必须守住的四条线",
+        "h_en": "Four lines that must hold",
+        "p": "一、联网只发生在用户明确发起的采集动作中，不做后台轮询、不做启动自检上报。二、所有远程响应当作不可信输入解析，而不是直接信任结构。三、本地数据库是唯一事实来源，远程数据必须先校验再落库。四、任何云端增强类功能都不应成为启动前提，否则离线能力就是假的。",
+        "p_en": "Network access only on an explicit user-initiated action, never background polling or startup telemetry; all remote responses parsed as untrusted input; the local database is the single source of truth, so remote data is validated before write; and no cloud-enhanced feature may be a startup prerequisite.",
+        "code": [
+          {
+            "lang": "rust",
+            "title": "启动路径里不出现任何网络调用",
+            "bad": "fn setup(app: &mut App) {\n    // Report, check updates and pull config at startup\n    tauri::async_runtime::spawn(async { check_update().await; });\n    tauri::async_runtime::spawn(async { fetch_remote_config().await; });\n}",
+            "good": "fn setup(app: &mut App) {\n    // Startup does local init only: create DB, migrate, load built-in knowledge\n    init_database(&app.handle())?;\n    load_builtin_knowledge(&app.handle())?;\n    // Network actions fire only on user click in the UI; failure never affects startup\n}",
+            "note": "这条纪律决定断网能不能用，也决定离线承诺是真是假",
+            "title_en": "No network calls on the startup path",
+            "note_en": "This discipline decides whether offline works and whether the offline claim is real"
+          }
+        ]
+      },
+      {
+        "h": "本地优先的代价与应对",
+        "h_en": "Costs of local-first and how to answer them",
+        "p": "代价有三个：数据只在这台机器上，设备损坏即丢失，必须提供备份；无法多人协作，对个人工具是优点、对团队工具是缺陷；更新只能靠用户主动升级，没有服务端强制下发。应对分别是内置一键备份恢复、把单机写进产品定位而不是缺陷列表、以及提供版本号与更新日志让用户自行判断。",
+        "p_en": "Three costs: data lives only on this machine, so device loss means data loss and backup is mandatory; no multi-user collaboration, a benefit for a personal tool and a defect for a team tool; and updates depend on voluntary upgrades. The answers: built-in backup and restore, framing single-machine operation as a position, and publishing version numbers and changelogs.",
+        "code": []
+      },
+      {
+        "h": "合规视角下的额外收益",
+        "h_en": "The compliance bonus",
+        "p": "对内网或受限场景，本地优先不只是体验选择，而是合规前提：数据不出机就意味着不触发数据出境、第三方处理、跨境传输等一系列义务。这也是本项目把\"数据不出本机\"作为核心价值落点的原因，它不是营销话术，而是把一整类合规风险从架构上消除。",
+        "p_en": "For intranet or restricted environments, local-first is not a UX preference but a compliance precondition: data never leaving the machine avoids obligations around data export, third-party processing and cross-border transfer. That is why data never leaving the machine is this project core value, eliminating a class of compliance risk architecturally.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP ASVS",
+        "url": "https://owasp.org/www-project-application-security-verification-standard/"
+      },
+      {
+        "name": "CWE-311: Missing Encryption of Sensitive Data",
+        "url": "https://cwe.mitre.org/data/definitions/311.html"
+      },
+      {
+        "name": "NIST Privacy Framework",
+        "url": "https://www.nist.gov/privacy-framework"
+      }
+    ],
+    "tags": [
+      "离线",
+      "本地优先",
+      "合规",
+      "架构"
+    ],
+    "quiz": [
+      {
+        "q": "离线优先应用在攻击面上的结构性优势是什么？",
+        "options": [
+          "代码更少",
+          "运行时没有常驻服务端组件，联网只在用户主动触发时短暂出现",
+          "不需要用户认证",
+          "不存储数据"
+        ],
+        "answer": 1,
+        "explain": "攻击窗口从持续开放变成偶尔打开几秒，这是架构级差异。",
+        "q_en": "What is the structural attack-surface advantage of an offline-first app?",
+        "options_en": [
+          "Less code",
+          "No resident server component, so the network appears only briefly on user action",
+          "No authentication needed",
+          "It stores no data"
+        ],
+        "explain_en": "The attack window shrinks from always-open to a few seconds, an architectural difference."
+      },
+      {
+        "q": "启动流程里出现网络调用会导致什么问题？",
+        "options": [
+          "启动变快",
+          "离线能力失效，断网时应用不可用或卡顿",
+          "内存占用降低",
+          "安装包变大"
+        ],
+        "answer": 1,
+        "explain": "只要启动依赖网络，断网可用就是一句空话。",
+        "q_en": "What breaks if the startup path makes network calls?",
+        "options_en": [
+          "Startup gets faster",
+          "Offline capability becomes fiction; the app fails or stalls without a network",
+          "Memory drops",
+          "The installer grows"
+        ],
+        "explain_en": "If startup depends on the network, works-offline is an empty claim."
+      },
+      {
+        "q": "本地优先方案必须配套提供什么？",
+        "options": [
+          "云同步",
+          "一键备份与恢复",
+          "多用户账号体系",
+          "在线客服"
+        ],
+        "answer": 1,
+        "explain": "数据只在本机时设备损坏等于数据丢失，备份不是可选功能。",
+        "q_en": "What must a local-first design ship with?",
+        "options_en": [
+          "Cloud sync",
+          "One-click backup and restore",
+          "Multi-user accounts",
+          "Online support chat"
+        ],
+        "explain_en": "With data only on one machine, device loss equals data loss; backup is not optional."
+      }
+    ]
+  },
+  {
+    "id": "cloud-epss-context",
+    "kind": "lesson",
+    "category": "桌面与云原生",
+    "cwe": null,
+    "title": "EPSS 与利用概率排序",
+    "title_en": "EPSS and Exploit Probability Ranking",
+    "level": "advanced",
+    "icon": "EPSS",
+    "color": "assess",
+    "summary": "CVSS 描述漏洞有多严重，EPSS 预测它未来 30 天内被利用的概率。前者是静态评分，后者是随时间变化的概率，两者回答的是不同问题。",
+    "summary_en": "CVSS describes how severe a vulnerability is; EPSS predicts the probability it will be exploited within 30 days. One is a static score, the other a time-varying probability.",
+    "sections": [
+      {
+        "h": "两个分数量的是什么",
+        "h_en": "What the two scores measure",
+        "p": "CVSS 衡量技术严重性，回答\"这个洞一旦被利用能造成多大后果\"。EPSS 是 FIRST 维护的预测模型，给每个 CVE 一个 0 到 1 的概率值，回答\"这个洞在近期真的会被利用吗\"。现实是绝大多数 CVE 永远不会被利用，所以高 CVSS 不等于必须马上处理，低 CVSS 也不等于可以忽略。",
+        "p_en": "CVSS measures technical severity: how bad the consequences would be if exploited. EPSS is a FIRST-maintained predictive model giving each CVE a probability between 0 and 1: will this actually be exploited soon. In reality most CVEs are never exploited, so a high CVSS does not mean fix now and a low one does not mean ignore.",
+        "code": []
+      },
+      {
+        "h": "怎么组合使用",
+        "h_en": "How to combine them",
+        "p": "一个实用的排序规则：先按是否已在已知被利用名录中分类，命中即最高优先；剩下的按 EPSS 降序，用 CVSS 作为同分时的次序。这样排出来的清单每天实际要动的往往只有几条，而不是几百条。单纯按 CVSS 排序的问题是，它会把大量永远不会被利用的高分漏洞排在真正需要处理的漏洞前面。",
+        "p_en": "A practical rule: first partition by whether it is in a known-exploited catalog, which is top priority; then sort the rest by EPSS descending with CVSS as tiebreaker. Such a list typically leaves only a handful of daily actions instead of hundreds. Sorting by CVSS alone pushes never-exploited high scores ahead of what actually needs attention.",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "三因子排序：已知被利用 > EPSS > CVSS",
+            "bad": "SELECT * FROM items\nORDER BY cvss_score DESC\nLIMIT 50;\n-- Result: many 9.8 scores that were never exploited fill the first screen",
+            "good": "SELECT * FROM items\nORDER BY\n  in_kev DESC,                              -- 1. known exploited first\n  CASE WHEN epss IS NULL THEN 1 ELSE 0 END, -- 2. missing values last, never zero\n  epss DESC,                                -- 3. exploitation probability descending\n  CASE WHEN cvss_score IS NULL THEN 1 ELSE 0 END,\n  cvss_score DESC\nLIMIT 50;",
+            "note": "缺失值与零值必须区分：未采集到 EPSS 不等于概率为 0",
+            "title_en": "Three-factor ordering: known exploited, then EPSS, then CVSS",
+            "note_en": "Missing and zero must be distinguished: no EPSS collected is not probability zero"
+          }
+        ]
+      },
+      {
+        "h": "数据来源与更新节奏",
+        "h_en": "Source and refresh cadence",
+        "p": "EPSS 由 FIRST 每日发布全量分数文件，覆盖全部已收录 CVE。采集时要一并保存分数与百分位两个字段，因为分数用于排序、百分位用于向人解释\"这比多少比例的漏洞更可能被利用\"。注意分数每天变化，历史快照不应被覆盖，否则无法回溯判断\"当时为什么这样排序\"。",
+        "p_en": "FIRST publishes a full daily score file covering all catalogued CVEs. Capture both the score and the percentile: the score sorts, the percentile explains to a human how it compares. Scores change daily, and historical snapshots should not be overwritten, or you cannot later explain why something was ranked as it was.",
+        "code": []
+      },
+      {
+        "h": "使用时最容易犯的错",
+        "h_en": "The most common mistakes",
+        "p": "三个错误：把 EPSS 当绝对阈值而不是相对排序，比如\"超过 0.1 就处理\"，结果同样是 0.1 的两个漏洞一个是内核一个是测试工具；忽略 EPSS 只覆盖有 CVE 编号的漏洞，未分配编号的问题完全不在模型里；以及忘记结合资产上下文，公网可达的内部工具与离线实验室的同名漏洞优先级完全不同。",
+        "p_en": "Three mistakes: treating EPSS as an absolute threshold rather than a relative rank, so two 0.1 findings — a kernel and a test utility — get identical treatment; forgetting EPSS only covers numbered CVEs, so unassigned issues are invisible to the model; and ignoring asset context, where an internet-reachable internal tool and an offline lab copy are not equivalent.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "FIRST EPSS",
+        "url": "https://www.first.org/epss/"
+      },
+      {
+        "name": "CISA KEV Catalog",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "name": "CWE-1395: Dependency on Vulnerable Third-Party Component",
+        "url": "https://cwe.mitre.org/data/definitions/1395.html"
+      }
+    ],
+    "tags": [
+      "EPSS",
+      "漏洞评估",
+      "优先级",
+      "威胁情报"
+    ],
+    "quiz": [
+      {
+        "q": "CVSS 与 EPSS 的核心区别是什么？",
+        "options": [
+          "一个是英文一个是中文",
+          "CVSS 衡量技术严重性，EPSS 预测近期被利用的概率",
+          "EPSS 只能用于云环境",
+          "CVSS 已废弃"
+        ],
+        "answer": 1,
+        "explain": "严重性回答后果有多大，概率回答会不会真发生，两者不能互相替代。",
+        "q_en": "What is the core difference between CVSS and EPSS?",
+        "options_en": [
+          "Language support",
+          "CVSS measures technical severity; EPSS predicts near-term exploitation probability",
+          "EPSS only applies to cloud",
+          "CVSS is deprecated"
+        ],
+        "explain_en": "Severity answers how bad the outcome would be; probability answers whether it will happen. Neither substitutes for the other."
+      },
+      {
+        "q": "排序时缺失的 EPSS 值应该如何处理？",
+        "options": [
+          "当作 0 处理",
+          "单独标记并排在末尾，不能与真实的低分混淆",
+          "按 CVSS 估算一个",
+          "直接丢弃该条目"
+        ],
+        "answer": 1,
+        "explain": "未采集到与概率为 0 是完全不同的语义，混为一谈会造成误判。",
+        "q_en": "How should a missing EPSS value be handled when sorting?",
+        "options_en": [
+          "Treat it as zero",
+          "Flag it separately and sort last, never conflating it with a genuine low score",
+          "Estimate one from CVSS",
+          "Discard the item"
+        ],
+        "explain_en": "Not collected and zero probability are different semantics; conflating them causes wrong judgments."
+      },
+      {
+        "q": "只按 EPSS 阈值判断是否处理，主要缺陷是什么？",
+        "options": [
+          "计算太慢",
+          "忽略资产上下文，同分的两个漏洞实际风险可能完全不同",
+          "EPSS 不支持中文",
+          "需要联网才能读"
+        ],
+        "answer": 1,
+        "explain": "公网暴露的组件与离线测试工具的同分漏洞，处理优先级不可能相同。",
+        "q_en": "What is the main flaw of acting on an EPSS threshold alone?",
+        "options_en": [
+          "It is slow",
+          "It ignores asset context, so two equal scores can carry very different real risk",
+          "EPSS is not localized",
+          "It requires network access"
+        ],
+        "explain_en": "An internet-exposed component and an offline test utility with the same score cannot share a priority."
+      }
+    ]
+  }
+]

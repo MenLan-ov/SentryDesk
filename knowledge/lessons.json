@@ -1,0 +1,1036 @@
+[
+  {
+    "id": "l-auth",
+    "kind": "lesson",
+    "category": "基础必修",
+    "cwe": null,
+    "title": "身份认证与授权",
+    "title_en": "Authentication vs Authorization",
+    "level": "beginner",
+    "icon": "AUTH",
+    "color": "auth",
+    "summary": "认证回答「你是谁」，授权回答「你能做什么」。把两者混为一谈，是绝大多数越权漏洞的源头。",
+    "summary_en": "Authentication proves identity; authorization grants access. Confusing them causes most broken access control.",
+    "sections": [
+      {
+        "h": "概念区分",
+        "p": "认证是建立身份的过程，产出是「当前请求代表哪个主体」。授权是判定该主体能否执行某个动作、访问某个资源，产出是「允许或拒绝」。登录成功只完成了前者。很多系统在登录后就不再判断，等于让任何登录用户拥有全站权限。",
+        "h_en": "Concept distinction",
+        "p_en": "Authentication establishes identity and yields which principal this request represents. Authorization decides whether that principal may perform an action or access a resource, yielding allow or deny. Login completes only the former. Many systems stop checking after login, effectively granting every authenticated user full-site permission."
+      },
+      {
+        "h": "常见认证方式与取舍",
+        "p": "口令认证最简单，但依赖用户密码强度，必须配合慢哈希存储与频率限制。多因素认证显著提升安全性，优先选择 TOTP 或硬件密钥，短信验证码易受 SIM 交换攻击。联合登录把身份外包给第三方，需谨慎校验回调与断言签名。",
+        "h_en": "Authentication methods and tradeoffs",
+        "p_en": "Password authentication is simplest but depends on user password strength, requiring slow hashing and rate limits. MFA significantly improves security; prefer TOTP or hardware keys, since SMS codes are vulnerable to SIM swapping. Federated login outsources identity, so callback and assertion signatures must be validated carefully."
+      },
+      {
+        "h": "会话管理的要点",
+        "p": "会话令牌应当是密码学安全的随机值，长度足够，登录成功后轮换。令牌存放优先 HttpOnly Cookie，避免被脚本读取。设置合理过期时间，并提供主动注销能力。服务端维护可吊销的会话状态，而不是仅依赖无状态令牌。",
+        "h_en": "Session management essentials",
+        "p_en": "Session tokens should be cryptographically secure randoms of sufficient length and rotated after login. Prefer HttpOnly cookies so scripts cannot read them. Set reasonable expiry and support active logout. Keep revocable session state server-side rather than relying solely on stateless tokens."
+      },
+      {
+        "h": "授权的正确姿势",
+        "p": "授权判定必须发生在服务端，且在数据访问点而非仅入口处。推荐把「资源 + 动作」作为授权单元，例如「订单 1001 + 读取」。坚持默认拒绝：未显式声明的权限一律不允许。前端隐藏按钮只是体验优化，不是安全控制。",
+        "h_en": "Doing authorization correctly",
+        "p_en": "Authorization decisions must happen server-side, at the data access point rather than only at the entry. Treat resource plus action as the authorization unit, for example order 1001 plus read. Insist on deny-by-default: anything not explicitly granted is forbidden. Hiding buttons in the frontend is UX, not security control."
+      },
+      {
+        "h": "自测清单",
+        "p": "去掉认证头重放每个接口，应全部拒绝。用低权限账号访问高权限接口，应全部拒绝。把资源 ID 改为他人的，应全部拒绝。注销后旧令牌应失效。",
+        "h_en": "Self-check list",
+        "p_en": "Replay every endpoint without the auth header; all should be refused. Access privileged endpoints with a low-privilege account; all should be refused. Change resource IDs to someone else's; all should be refused. After logout old tokens must be invalid."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Authentication Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
+      },
+      {
+        "name": "OWASP Authorization Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "认证",
+      "授权",
+      "基础"
+    ],
+    "quiz": [
+      {
+        "q": "登录成功后的下一次请求，系统还需要判断什么？",
+        "options": [
+          "不需要，已登录即全权",
+          "需要判断该用户是否被授权访问该资源",
+          "需要重新校验密码",
+          "需要判断浏览器型号"
+        ],
+        "answer": 1,
+        "explain": "认证解决身份，授权解决权限，缺一不可。",
+        "q_en": "What must the system still determine on the next request after login?",
+        "options_en": [
+          "Nothing, login grants full rights",
+          "Whether this user is authorized for the resource",
+          "Revalidate the password",
+          "Check the browser type"
+        ],
+        "explain_en": "Authentication handles identity; authorization handles permission; both are required."
+      },
+      {
+        "q": "会话令牌登录成功后应该？",
+        "options": [
+          "保持不变",
+          "轮换为新令牌",
+          "存进 localStorage",
+          "写进 URL"
+        ],
+        "answer": 1,
+        "explain": "防止会话固定攻击。",
+        "q_en": "What should happen to the session token after successful login?",
+        "options_en": [
+          "Stay the same",
+          "Rotate to a new token",
+          "Store in localStorage",
+          "Put it in the URL"
+        ],
+        "explain_en": "Prevents session fixation."
+      },
+      {
+        "q": "前端隐藏了管理员按钮，是否等于做了授权？",
+        "options": [
+          "等于",
+          "不等于，接口必须独立校验",
+          "取决于框架",
+          "部分等于"
+        ],
+        "answer": 1,
+        "explain": "隐藏只是体验优化，直接请求接口即可绕过。",
+        "q_en": "If the admin button is hidden in the frontend, is authorization done?",
+        "options_en": [
+          "Yes",
+          "No, the API must validate independently",
+          "Depends on framework",
+          "Partially yes"
+        ],
+        "explain_en": "Hiding is UX; calling the API directly bypasses it."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-injection",
+    "kind": "lesson",
+    "category": "基础必修",
+    "cwe": null,
+    "title": "注入类漏洞的通病",
+    "title_en": "The Common Thread Behind Injections",
+    "level": "beginner",
+    "icon": "INJ",
+    "color": "injection",
+    "summary": "SQL 注入、命令注入、XSS、模板注入看起来千差万别，本质都是同一件事：数据被当成了代码。",
+    "summary_en": "All injection classes share one root cause: data interpreted as code.",
+    "sections": [
+      {
+        "h": "统一模型",
+        "p": "任何把外部输入与语法结构拼接的地方，都潜藏注入。数据库的 SQL 语法、shell 的命令语法、浏览器的 HTML 语法、模板引擎的表达式语法，都是「代码」的一种。程序没能守住「数据」与「代码」的边界，注入就成立。",
+        "h_en": "Unified model",
+        "p_en": "Anywhere external input is concatenated with syntax structure, injection lurks. SQL syntax for databases, shell syntax for commands, HTML syntax for browsers, expression syntax for templates are all forms of code. When the program fails to keep the boundary between data and code, injection succeeds."
+      },
+      {
+        "h": "为什么转义经常失效",
+        "p": "因为转义依赖上下文。同一个字符在 HTML 正文、属性值、URL 参数、JS 字符串里有不同的含义与转义规则。用一套转义处理所有位置，必然在某个上下文里漏掉。正确做法是先确定输出上下文，再选择对应的编码函数。",
+        "h_en": "Why escaping often fails",
+        "p_en": "Because escaping is context dependent. The same character means different things in HTML body, attribute values, URL parameters, and JS strings. One escape for all positions must leak in some context. Correct practice identifies the output context first, then applies the matching encoding function."
+      },
+      {
+        "h": "正确解法只有两条",
+        "p": "第一条是参数化：让语法结构和数据在接口层面分离，SQL 用预编译、命令用参数数组、模板用自动转义。第二条是白名单：当语法结构本身需要动态（表名、排序方向、跳转目标），不做字符串拼接，而是从固定集合中选值。",
+        "h_en": "Only two correct solutions",
+        "p_en": "The first is parameterization: separate syntax structure from data at the interface level, using prepared statements for SQL, argument arrays for commands, auto-escaping for templates. The second is whitelisting: when the syntax structure itself must be dynamic (table names, sort direction, redirect targets), do not concatenate strings but select from a fixed set."
+      },
+      {
+        "h": "审计抓手",
+        "p": "在代码里搜索所有把外部输入拼接进字符串的位置：SQL 的字符串加法、shell 的字符串格式化、HTML 的 innerHTML 赋值、模板的动态编译。每一个都是待验证的注入点。",
+        "h_en": "Audit handles",
+        "p_en": "Search the code for every place external input is concatenated into a string: SQL string addition, shell formatting, innerHTML assignment, dynamic template compilation. Each is an injection point to verify."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Injection Prevention",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "注入",
+      "原理"
+    ],
+    "quiz": [
+      {
+        "q": "注入类漏洞的共同本质是？",
+        "options": [
+          "拼接字符串",
+          "数据被当作代码解释",
+          "缺少加密",
+          "缺少日志"
+        ],
+        "answer": 1,
+        "explain": "守住数据与代码的边界是统一解法。",
+        "q_en": "What is the shared essence of injection vulnerabilities?",
+        "options_en": [
+          "String concatenation",
+          "Data being interpreted as code",
+          "Missing encryption",
+          "Missing logs"
+        ],
+        "explain_en": "Keeping the data and code boundary intact is the unified fix."
+      },
+      {
+        "q": "为什么一套转义往往挡不住所有注入？",
+        "options": [
+          "因为编码太慢",
+          "因为转义依赖输出上下文",
+          "因为浏览器不支持",
+          "因为字符集问题"
+        ],
+        "answer": 1,
+        "explain": "HTML、属性、URL、JS 各有不同规则。",
+        "q_en": "Why does one escape rarely stop all injections?",
+        "options_en": [
+          "Encoding is slow",
+          "Escaping depends on output context",
+          "Browsers lack support",
+          "Charset issues"
+        ],
+        "explain_en": "HTML, attributes, URLs, and JS each have different rules."
+      },
+      {
+        "q": "字段名、排序方向这类动态语法结构应如何安全处理？",
+        "options": [
+          "字符串拼接",
+          "白名单映射",
+          "URL 编码",
+          "加引号"
+        ],
+        "answer": 1,
+        "explain": "无法参数化的位置只能靠白名单。",
+        "q_en": "How should dynamic syntax such as column names and sort direction be handled?",
+        "options_en": [
+          "String concatenation",
+          "Whitelist mapping",
+          "URL encoding",
+          "Wrap in quotes"
+        ],
+        "explain_en": "Positions that cannot be parameterized can only be whitelisted."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-cvss",
+    "kind": "lesson",
+    "category": "评估方法",
+    "cwe": null,
+    "title": "读懂 CVSS 评分",
+    "title_en": "Reading CVSS Scores",
+    "level": "beginner",
+    "icon": "CVSS",
+    "color": "assess",
+    "summary": "CVSS 不是「危险程度」的绝对值，而是标准化的严重性度量。看分值更要看向量。",
+    "summary_en": "CVSS is a standardized severity metric; read the vector, not just the number.",
+    "sections": [
+      {
+        "h": "分值区间",
+        "p": "0.1–3.9 低危，4.0–6.9 中危，7.0–8.9 高危，9.0–10.0 严重。这个区间对应的是基础评分，回答「如果被利用，后果有多严重」，不回答「有多容易被利用」。",
+        "h_en": "Score ranges",
+        "p_en": "0.1 to 3.9 low, 4.0 to 6.9 medium, 7.0 to 8.9 high, 9.0 to 10.0 critical. These ranges describe base scores answering how severe exploitation would be, not how easy exploitation is."
+      },
+      {
+        "h": "向量的六个维度",
+        "p": "攻击途径 AV（网络、相邻、本地、物理）、攻击复杂度 AC（低、高）、所需权限 PR（无、低、高）、用户交互 UI（无、需要）、影响范围 S（不变、改变）、机密性/完整性/可用性影响 CIA（无、低、高）。同样的 7.5 分，可能是「网络可达且无需认证」也可能是「需要本地登录」。",
+        "h_en": "The six vector dimensions",
+        "p_en": "Attack vector AV (network, adjacent, local, physical), attack complexity AC (low, high), privileges required PR (none, low, high), user interaction UI (none, required), scope S (unchanged, changed), and confidentiality, integrity, availability impact CIA (none, low, high). The same 7.5 might mean network reachable with no auth, or local login required."
+      },
+      {
+        "h": "容易被误读的地方",
+        "p": "CVSS 高分不代表立刻要修，低分不代表可以忽略——如果资产暴露在公网且该组件被实际利用。CVSS 不含环境因素，实际处置要结合资产重要性与是否存在在野利用（如 CISA KEV 名单）。",
+        "h_en": "Frequently misread points",
+        "p_en": "A high CVSS score does not mean fix immediately, and a low score does not mean ignore, if the asset is internet facing and the component is actively exploited. CVSS excludes environmental factors; real prioritization combines asset criticality with active exploitation (such as the CISA KEV list)."
+      },
+      {
+        "h": "实战排序建议",
+        "p": "先看是否在 KEV 名单（已确认在野利用），再看攻击途径是否为网络可达，再看是否需要认证，最后看 CVSS 分值。这个顺序比单纯按分值排序更贴近真实风险。",
+        "h_en": "Practical ordering",
+        "p_en": "First check KEV membership (confirmed exploitation), then whether the attack vector is network reachable, then whether authentication is required, and only then the CVSS score. This order is closer to real risk than sorting by score alone."
+      }
+    ],
+    "refs": [
+      {
+        "name": "FIRST CVSS v3.1 Specification",
+        "url": "https://www.first.org/cvss/v3-1/specification-document"
+      },
+      {
+        "name": "CISA KEV Catalog",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      }
+    ],
+    "tags": [
+      "评估",
+      "CVSS"
+    ],
+    "quiz": [
+      {
+        "q": "CVSS 9.8 意味着？",
+        "options": [
+          "已被在野利用",
+          "基础评分严重，但未说明是否被利用",
+          "修复很简单",
+          "影响所有系统"
+        ],
+        "answer": 1,
+        "explain": "基础评分描述严重性，不描述利用状态。",
+        "q_en": "What does CVSS 9.8 mean?",
+        "options_en": [
+          "It is being exploited",
+          "Base severity is critical, but exploitation status is not indicated",
+          "Easy to fix",
+          "Affects all systems"
+        ],
+        "explain_en": "Base scores describe severity, not exploitation."
+      },
+      {
+        "q": "判断优先级时，比 CVSS 分值更强的信号是？",
+        "options": [
+          "发布时间",
+          "是否进入 CISA KEV 名单",
+          "厂商规模",
+          "文件名"
+        ],
+        "answer": 1,
+        "explain": "在野利用是决定性信号。",
+        "q_en": "Which signal outweighs the CVSS score when prioritizing?",
+        "options_en": [
+          "Publication date",
+          "Membership in the CISA KEV list",
+          "Vendor size",
+          "Filename"
+        ],
+        "explain_en": "Active exploitation is the decisive signal."
+      },
+      {
+        "q": "同样的 7.5 分，为何风险可能不同？",
+        "options": [
+          "分值算错了",
+          "向量不同：可达性与所需权限可能差异很大",
+          "CVSS 不可信",
+          "取决于语言"
+        ],
+        "answer": 1,
+        "explain": "网络可达且无需认证的风险高于需本地登录。",
+        "q_en": "Why can the same 7.5 carry different risk?",
+        "options_en": [
+          "The score was miscalculated",
+          "Vectors differ: reachability and required privileges vary",
+          "CVSS is unreliable",
+          "Depends on language"
+        ],
+        "explain_en": "Network reachable without auth is riskier than requiring local login."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-cwe",
+    "kind": "lesson",
+    "category": "评估方法",
+    "cwe": null,
+    "title": "CWE：给缺陷归类",
+    "title_en": "CWE: Classifying Weaknesses",
+    "level": "intermediate",
+    "icon": "CWE",
+    "color": "assess",
+    "summary": "CWE 描述的是「软件为什么会产生漏洞」，与描述「某个具体漏洞」的 CVE 互为坐标。",
+    "summary_en": "CWE classifies weakness types; CVE identifies individual vulnerabilities.",
+    "sections": [
+      {
+        "h": "CVE 与 CWE 的关系",
+        "p": "CVE 是一条具体的漏洞记录，有唯一编号、受影响的版本、公开时间。CWE 是一类缺陷模式，同一 CWE 可以对应成百上千个 CVE。看 CVE 解决「这个版本要升级吗」，看 CWE 解决「我们的开发流程哪里要改」。",
+        "h_en": "Relationship between CVE and CWE",
+        "p_en": "CVE is a specific vulnerability record with a unique ID, affected versions, and publication date. CWE is a class of weakness pattern, and one CWE may correspond to thousands of CVEs. CVE answers whether this version must be upgraded; CWE answers where the development process must change."
+      },
+      {
+        "h": "Top 25 的意义",
+        "p": "MITRE 每年发布的 CWE Top 25 按真实漏洞数据的出现频率与严重性排序，反映的是「业界最常见的错误」。用它来设计代码审查清单与培训内容，比逐个追 CVE 更有效。",
+        "h_en": "Meaning of the Top 25",
+        "p_en": "MITRE publishes the CWE Top 25 annually, ordered by frequency and severity in real vulnerability data, reflecting the most common mistakes in the industry. Designing review checklists and training around it is more effective than chasing individual CVEs."
+      },
+      {
+        "h": "如何用在工程里",
+        "p": "在缺陷跟踪系统里为每个安全问题标注 CWE 编号，形成组织内的缺陷分布画像。对高频 CWE 建立针对性的静态检查规则与代码评审要点。把 CWE 映射到安全的编码规范条目。",
+        "h_en": "Using it in engineering",
+        "p_en": "Tag each security issue with a CWE ID in the defect tracker to build a defect distribution profile for the organization. Establish targeted static analysis rules and code review points for high-frequency CWEs. Map CWEs to secure coding standard entries."
+      },
+      {
+        "h": "本工具的用法",
+        "p": "每个漏洞条目都尽量标注 CWE，点击 CWE 即可跳到对应的教学卡，看到这一类缺陷的原理、成因与通用解决办法。这样从「修一个洞」上升到「修一类问题」。",
+        "h_en": "Usage in this tool",
+        "p_en": "Each vulnerability item is tagged with a CWE where possible; clicking it jumps to the corresponding lesson card showing the class principle, causes, and general fixes. This elevates from fixing one hole to fixing a class of problems."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE",
+        "url": "https://cwe.mitre.org/"
+      },
+      {
+        "name": "CWE Top 25",
+        "url": "https://cwe.mitre.org/top25/"
+      }
+    ],
+    "tags": [
+      "评估",
+      "CWE",
+      "方法论"
+    ],
+    "quiz": [
+      {
+        "q": "CVE 与 CWE 的关系是？",
+        "options": [
+          "同一个东西",
+          "CVE 是具体漏洞，CWE 是缺陷类型",
+          "CWE 是 CVE 的子集",
+          "CWE 只用于硬件"
+        ],
+        "answer": 1,
+        "explain": "一个是实例，一个是类别。",
+        "q_en": "Relationship between CVE and CWE?",
+        "options_en": [
+          "The same thing",
+          "CVE is a specific vulnerability, CWE is a weakness class",
+          "CWE is a subset of CVE",
+          "CWE is hardware only"
+        ],
+        "explain_en": "One is an instance, the other a category."
+      },
+      {
+        "q": "CWE Top 25 用来做什么最合适？",
+        "options": [
+          "决定升级哪些组件",
+          "设计代码审查清单与培训内容",
+          "计算 CVSS",
+          "生成报告标题"
+        ],
+        "answer": 1,
+        "explain": "它反映业界最常见的错误类型。",
+        "q_en": "What is CWE Top 25 best used for?",
+        "options_en": [
+          "Deciding which component to upgrade",
+          "Designing review checklists and training",
+          "Computing CVSS",
+          "Generating report titles"
+        ],
+        "explain_en": "It reflects the most common mistakes in the industry."
+      },
+      {
+        "q": "在缺陷系统里标注 CWE 编号的价值是？",
+        "options": [
+          "便于统计缺陷分布，针对性改进流程",
+          "让报告更长",
+          "满足格式要求",
+          "没有价值"
+        ],
+        "answer": 1,
+        "explain": "从修一个洞上升到修一类问题。",
+        "q_en": "Value of tagging defects with CWE IDs?",
+        "options_en": [
+          "Enables defect distribution analysis and targeted process improvement",
+          "Longer reports",
+          "Format compliance",
+          "No value"
+        ],
+        "explain_en": "It elevates from fixing one hole to fixing a class."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-triage",
+    "kind": "lesson",
+    "category": "处置流程",
+    "cwe": null,
+    "title": "漏洞处置的标准流程",
+    "title_en": "Vulnerability Triage Workflow",
+    "level": "intermediate",
+    "icon": "TRIAGE",
+    "color": "process",
+    "summary": "从「看到一条公告」到「确认已修复」，中间有六个必须走的步骤，跳步就会反复返工。",
+    "summary_en": "A six-step loop from advisory to verified remediation.",
+    "sections": [
+      {
+        "h": "第一步 识别资产",
+        "p": "先确认这条漏洞涉及的产品是否在你的资产清单里，版本是否落在受影响范围。这一步最容易出错：同名产品可能有不同分支，版本号规则各不相同。拿不到准确版本时，按「可能受影响」处理并安排核实。",
+        "h_en": "Step one: identify assets",
+        "p_en": "First confirm whether the affected product is in your inventory and whether the version falls in the affected range. This step is error prone: similarly named products have different branches and versioning rules. When the exact version is unknown, treat it as possibly affected and schedule verification."
+      },
+      {
+        "h": "第二步 评估暴露面",
+        "p": "该组件是否对外可达。内网组件与公网组件的处置优先级差异巨大。同时确认是否存在前置条件（需要认证、需要特定配置）。",
+        "h_en": "Step two: assess exposure",
+        "p_en": "Determine whether the component is externally reachable. Internal and internet facing components differ greatly in priority. Also confirm preconditions such as authentication or specific configuration."
+      },
+      {
+        "h": "第三步 查利用状态",
+        "p": "查询该 CVE 是否已进入 CISA KEV 名单，以及公开渠道是否已有可用利用代码。在野利用是提升优先级的决定性信号。",
+        "h_en": "Step three: check exploitation status",
+        "p_en": "Query whether the CVE is in the CISA KEV list and whether public exploit code exists. Active exploitation is the decisive signal for raising priority."
+      },
+      {
+        "h": "第四步 定优先级",
+        "p": "综合资产重要性、暴露面、利用状态、CVSS 分值给出处置时限。建议分三档：立即处置（在野利用且公网可达）、本周期处置（高危且可达）、常规排期（其余）。",
+        "h_en": "Step four: set priority",
+        "p_en": "Combine asset criticality, exposure, exploitation status, and CVSS score into a remediation deadline. Three tiers are recommended: immediate (exploited and internet facing), this cycle (high severity and reachable), and routine scheduling (everything else)."
+      },
+      {
+        "h": "第五步 执行与记录",
+        "p": "执行修复（升级、打补丁、加缓解措施），记录处置动作、执行人、时间。若暂时无法修复，必须记录补偿性控制（如 WAF 规则、访问限制）及其有效期。",
+        "h_en": "Step five: execute and record",
+        "p_en": "Perform the fix (upgrade, patch, mitigation) and record the action, owner, and time. If fixing is temporarily impossible, record compensating controls (WAF rules, access restrictions) with their validity period."
+      },
+      {
+        "h": "第六步 验证闭环",
+        "p": "修复后必须验证：版本已变、漏洞特征已消失、功能未回归。把验证结果回填到记录，形成可审计的闭环。未验证的「已修复」等于没修。",
+        "h_en": "Step six: verify closure",
+        "p_en": "After fixing you must verify: the version changed, the vulnerability signature is gone, and functionality did not regress. Write the verification back into the record to form an auditable loop. Unverified fixed equals not fixed."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-40 Rev.4",
+        "url": "https://csrc.nist.gov/pubs/sp/800/40/r4/final"
+      },
+      {
+        "name": "CISA KEV",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      }
+    ],
+    "tags": [
+      "流程",
+      "处置",
+      "方法论"
+    ],
+    "quiz": [
+      {
+        "q": "漏洞处置第一步应该做什么？",
+        "options": [
+          "立刻升级组件",
+          "确认资产是否在受影响范围内",
+          "写报告",
+          "通知领导"
+        ],
+        "answer": 1,
+        "explain": "先判断是否相关，避免无效工作。",
+        "q_en": "What is the first step in vulnerability triage?",
+        "options_en": [
+          "Upgrade immediately",
+          "Confirm whether the asset is in the affected range",
+          "Write the report",
+          "Notify leadership"
+        ],
+        "explain_en": "Determine relevance first to avoid wasted effort."
+      },
+      {
+        "q": "暂时无法修复时应该？",
+        "options": [
+          "忽略",
+          "记录补偿性控制及其有效期",
+          "降低评级",
+          "删除记录"
+        ],
+        "answer": 1,
+        "explain": "补偿控制是合规且必要的过渡手段。",
+        "q_en": "When a fix is temporarily impossible you should?",
+        "options_en": [
+          "Ignore it",
+          "Record compensating controls and their validity",
+          "Downgrade severity",
+          "Delete the record"
+        ],
+        "explain_en": "Compensating controls are a legitimate transitional measure."
+      },
+      {
+        "q": "修复后必须做什么才算闭环？",
+        "options": [
+          "提交代码",
+          "验证版本已变且漏洞特征消失",
+          "写邮件",
+          "更新文档"
+        ],
+        "answer": 1,
+        "explain": "未验证的\"已修复\"等于没修。",
+        "q_en": "What completes the loop after fixing?",
+        "options_en": [
+          "Committing code",
+          "Verifying the version changed and the signature is gone",
+          "Sending email",
+          "Updating docs"
+        ],
+        "explain_en": "Unverified fixed equals not fixed."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-defense",
+    "kind": "lesson",
+    "category": "处置流程",
+    "cwe": null,
+    "title": "纵深防御与最小权限",
+    "title_en": "Defense in Depth & Least Privilege",
+    "level": "beginner",
+    "icon": "DEF",
+    "color": "process",
+    "summary": "两个原则决定了系统的整体抗打击能力：不依赖单点防线，不给多余权限。",
+    "summary_en": "Two principles shape resilience: layered controls and minimal privileges.",
+    "sections": [
+      {
+        "h": "纵深防御",
+        "p": "任何单一控制都可能失效。纵深的含义是：即使某一层被绕过，后面还有一层。例如输入校验失败，还有参数化查询兜底；参数化失效，还有数据库最小权限兜底；账号被攻破，还有网络分段限制横向移动。",
+        "h_en": "Defense in depth",
+        "p_en": "Any single control can fail. Depth means that even if one layer is bypassed, another remains. If input validation fails, parameterized queries still stand; if those fail, database least privilege limits damage; if an account falls, network segmentation restricts lateral movement."
+      },
+      {
+        "h": "最小权限",
+        "p": "每个进程、账号、服务只应具备完成其职责所必需的最小权限。服务不以 root 运行，数据库账号不给 DDL 权限，容器挂载只读文件系统，云上角色策略不用通配符。",
+        "h_en": "Least privilege",
+        "p_en": "Each process, account, and service should hold only the minimum rights required by its duties. Services should not run as root, database accounts should not hold DDL, containers should mount read-only filesystems, and cloud role policies should avoid wildcards."
+      },
+      {
+        "h": "失效安全",
+        "p": "当控制措施本身出错时，默认结果应当是「拒绝」而不是「放行」。鉴权服务超时应当拒绝请求，证书校验失败应当终止连接，规则解析失败应当阻断流量。",
+        "h_en": "Fail safe",
+        "p_en": "When a control itself fails, the default outcome should be deny rather than allow. An authorization service timing out should refuse the request; certificate validation failure should terminate the connection; rule parsing failure should block traffic."
+      },
+      {
+        "h": "如何落地",
+        "p": "把这三条写进架构评审清单。新服务上线前必须回答：如果认证被绕过，还有什么能挡住？如果这个账号泄露，影响范围有多大？如果依赖的服务挂了，默认行为是拒绝还是放行？",
+        "h_en": "Putting it into practice",
+        "p_en": "Write these three into the architecture review checklist. Before a new service ships it must answer: if authentication is bypassed, what else stops the attacker? If this account leaks, what is the blast radius? If a dependency fails, is the default deny or allow?"
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-53",
+        "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+      },
+      {
+        "name": "OWASP Defense in Depth",
+        "url": "https://owasp.org/www-community/Defense_in_Depth"
+      }
+    ],
+    "tags": [
+      "架构",
+      "原则"
+    ],
+    "quiz": [
+      {
+        "q": "纵深防御的含义是？",
+        "options": [
+          "部署更多设备",
+          "即使某层被绕过仍有后一层兜底",
+          "增加密码复杂度",
+          "加密所有流量"
+        ],
+        "answer": 1,
+        "explain": "不依赖单点防线。",
+        "q_en": "What does defense in depth mean?",
+        "options_en": [
+          "Deploy more devices",
+          "Even if one layer is bypassed, another remains",
+          "Increase password complexity",
+          "Encrypt all traffic"
+        ],
+        "explain_en": "Do not rely on a single control."
+      },
+      {
+        "q": "控制措施本身出错时，默认行为应该是？",
+        "options": [
+          "放行",
+          "拒绝",
+          "重试",
+          "忽略"
+        ],
+        "answer": 1,
+        "explain": "失效安全（fail closed）。",
+        "q_en": "When a control itself fails, the default behavior should be?",
+        "options_en": [
+          "Allow",
+          "Deny",
+          "Retry",
+          "Ignore"
+        ],
+        "explain_en": "Fail closed."
+      },
+      {
+        "q": "容器内以非 root 运行属于哪个原则？",
+        "options": [
+          "纵深防御",
+          "最小权限",
+          "输入校验",
+          "加密"
+        ],
+        "answer": 1,
+        "explain": "限制被攻破后的影响范围。",
+        "q_en": "Running containers as non-root belongs to which principle?",
+        "options_en": [
+          "Defense in depth",
+          "Least privilege",
+          "Input validation",
+          "Encryption"
+        ],
+        "explain_en": "Bounds the impact once compromised."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-secrets",
+    "kind": "lesson",
+    "category": "工程实践",
+    "cwe": null,
+    "title": "凭据与密钥管理",
+    "title_en": "Secrets Management",
+    "level": "intermediate",
+    "icon": "KEY",
+    "color": "secret",
+    "summary": "密钥泄露几乎总是发生在「临时方便」的那一次，而不是设计阶段。",
+    "summary_en": "Secret leaks almost always come from a one-off convenience.",
+    "sections": [
+      {
+        "h": "三类常见泄露",
+        "p": "一是提交历史里的残留：文件删掉了，但 git 历史还在。二是构建产物里的常量：前端打包把密钥编进 JS。三是运行时环境的不当暴露：调试接口回显环境变量、日志打印完整配置。",
+        "h_en": "Three common leaks",
+        "p_en": "First, residue in commit history: the file was deleted but git history remains. Second, constants in build artifacts: frontend bundling compiles keys into JavaScript. Third, improper runtime exposure: debug endpoints echoing environment variables, logs printing full configuration."
+      },
+      {
+        "h": "外置化的正确做法",
+        "p": "代码里只出现「去哪取」而不出现「值是什么」。优先级从高到低：专用密钥管理服务、容器编排的 Secret 对象、加密的配置文件、环境变量。环境变量是下限，不是最佳实践——它能被同机进程读取，也会进入崩溃转储。",
+        "h_en": "Correct externalization",
+        "p_en": "Code should only reference where to obtain a secret, never its value. Priority from high to low: a dedicated secret management service, orchestration Secret objects, encrypted configuration files, environment variables. Environment variables are a floor, not best practice, since same-host processes can read them and they enter crash dumps."
+      },
+      {
+        "h": "轮换与吊销",
+        "p": "设计时就假设密钥会泄露：给每个密钥标注所有者、用途、有效期，准备好轮换脚本。发现泄露时的第一步是吊销而非删除，因为删除无法阻止已复制的副本被使用。",
+        "h_en": "Rotation and revocation",
+        "p_en": "Design assuming keys will leak: record owner, purpose, and validity for each key and prepare rotation scripts. On discovering a leak the first step is revocation rather than deletion, because deletion cannot stop already-copied instances from being used."
+      },
+      {
+        "h": "工程化防护",
+        "p": "提交前钩子做密钥模式匹配扫描，接入 CI 阻断。对完整历史做一次性扫描清理。在代码评审清单里加入「本次改动是否引入了新的凭据」。",
+        "h_en": "Engineering protection",
+        "p_en": "Run pre-commit hooks matching secret patterns into CI blocking. Perform a one-time full history scan and cleanup. Add whether this change introduces new credentials to the code review checklist."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Secrets Management Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "凭据",
+      "工程"
+    ],
+    "quiz": [
+      {
+        "q": "发现密钥泄露，第一步是？",
+        "options": [
+          "从代码删除",
+          "立即吊销并轮换",
+          "改成环境变量",
+          "加注释说明"
+        ],
+        "answer": 1,
+        "explain": "删除挡不住已复制的副本。",
+        "q_en": "First step when a key leaks?",
+        "options_en": [
+          "Delete it from code",
+          "Revoke and rotate immediately",
+          "Move to environment variable",
+          "Add a comment"
+        ],
+        "explain_en": "Deleting cannot stop copied instances."
+      },
+      {
+        "q": "git 历史里的密钥，删掉文件后安全了吗？",
+        "options": [
+          "安全了",
+          "没有，历史仍可检出",
+          "取决于仓库大小",
+          "取决于是否私有"
+        ],
+        "answer": 1,
+        "explain": "按已泄露处置。",
+        "q_en": "Is a key removed from a file safe from git?",
+        "options_en": [
+          "Yes",
+          "No, history still contains it",
+          "Depends on repo size",
+          "Depends on visibility"
+        ],
+        "explain_en": "Treat as leaked."
+      },
+      {
+        "q": "前端打包产物里放密钥为何不可行？",
+        "options": [
+          "体积大",
+          "打包产物可被直接读取",
+          "跨域限制",
+          "浏览器不支持"
+        ],
+        "answer": 1,
+        "explain": "前端没有秘密。",
+        "q_en": "Why can't keys live in frontend bundles?",
+        "options_en": [
+          "Bundle size",
+          "Built artifacts can be read directly",
+          "CORS restrictions",
+          "Browser limits"
+        ],
+        "explain_en": "The frontend holds no secrets."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-registry",
+    "kind": "lesson",
+    "category": "数据来源",
+    "cwe": null,
+    "title": "安全情报源怎么读",
+    "title_en": "Reading Security Intelligence Feeds",
+    "level": "beginner",
+    "icon": "FEED",
+    "color": "source",
+    "summary": "NVD、GHSA、CISA KEV 各有侧重，单独看任何一个都会漏，也都会产生噪声。",
+    "summary_en": "NVD, GHSA, and CISA KEV each cover a different slice of the picture.",
+    "sections": [
+      {
+        "h": "NVD：覆盖面最广的底座",
+        "p": "NVD 维护 CVE 的标准化描述、CVSS 评分、受影响配置（CPE）。它是漏洞信息的公共底稿，几乎所有下游产品都基于它。缺点是录入有延迟，新披露的 CVE 可能几天内还没有评分。",
+        "h_en": "NVD: the broad foundation",
+        "p_en": "NVD maintains standardized CVE descriptions, CVSS scores, and affected configurations (CPE). It is the public substrate for vulnerability information, and nearly every downstream product builds on it. The tradeoff is enrichment latency: newly disclosed CVEs may lack scores for days."
+      },
+      {
+        "h": "GHSA：生态视角",
+        "p": "GitHub Security Advisory 聚焦开源软件包生态，直接给出受影响的包名、受影响版本区间、已修复版本。对使用包管理器的团队来说，它比 NVD 更贴近「我该升级到哪个版本」。它也会标注 CVE 编号，可与 NVD 关联。",
+        "h_en": "GHSA: the ecosystem view",
+        "p_en": "GitHub Security Advisory focuses on open source package ecosystems, giving affected package names, vulnerable version ranges, and fixed versions. For teams using package managers it is closer to which version should I upgrade to than NVD. It also tags CVE IDs for correlation."
+      },
+      {
+        "h": "CISA KEV：优先级的裁决者",
+        "p": "KEV 只收录「已确认在野利用」的漏洞，条数少但信号极强。它不提供 CVSS 分值，而是提供处置要求与截止日期。处置时应把 KEV 命中视为最高优先级信号，优先于 CVSS 分数。",
+        "h_en": "CISA KEV: the priority arbiter",
+        "p_en": "KEV only includes vulnerabilities with confirmed exploitation. Counts are small but the signal is strong. It does not provide CVSS scores but does provide required actions and due dates. Treat a KEV hit as the highest priority signal, above the CVSS score."
+      },
+      {
+        "h": "组合使用",
+        "p": "用 NVD 建底稿拿到完整描述与评分，用 GHSA 拿到包级别的精确版本信息，用 KEV 标记出必须立刻处理的条目。三者通过 CVE 编号关联，这也是本工具把 CVE 作为主键线索的原因。",
+        "h_en": "Combined use",
+        "p_en": "Use NVD as the substrate for complete descriptions and scores, GHSA for precise package-level version information, and KEV to flag items demanding immediate action. All three correlate through CVE IDs, which is why this tool uses CVE as the primary key."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NVD API",
+        "url": "https://nvd.nist.gov/developers/vulnerabilities"
+      },
+      {
+        "name": "GitHub Advisory Database",
+        "url": "https://github.com/advisories"
+      },
+      {
+        "name": "CISA KEV",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      }
+    ],
+    "tags": [
+      "情报源",
+      "方法论"
+    ],
+    "quiz": [
+      {
+        "q": "哪个源最适合判断\"是否已被在野利用\"？",
+        "options": [
+          "NVD",
+          "GHSA",
+          "CISA KEV",
+          "RSS 资讯"
+        ],
+        "answer": 2,
+        "explain": "KEV 只收录已确认在野利用的漏洞。",
+        "q_en": "Which source best indicates active exploitation?",
+        "options_en": [
+          "NVD",
+          "GHSA",
+          "CISA KEV",
+          "RSS news"
+        ],
+        "explain_en": "KEV only includes confirmed exploitation."
+      },
+      {
+        "q": "哪个源最适合查\"升级到哪个版本\"？",
+        "options": [
+          "CISA KEV",
+          "GitHub Security Advisory",
+          "厂商官网新闻",
+          "论坛"
+        ],
+        "answer": 1,
+        "explain": "GHSA 直接给出受影响区间与已修复版本。",
+        "q_en": "Which source best indicates which version to upgrade to?",
+        "options_en": [
+          "CISA KEV",
+          "GitHub Security Advisory",
+          "Vendor news",
+          "Forums"
+        ],
+        "explain_en": "GHSA gives vulnerable ranges and fixed versions directly."
+      },
+      {
+        "q": "三个源如何关联？",
+        "options": [
+          "按标题",
+          "按 CVE 编号",
+          "按时间",
+          "按文件名"
+        ],
+        "answer": 1,
+        "explain": "CVE 是公共主键。",
+        "q_en": "How do the three sources correlate?",
+        "options_en": [
+          "By title",
+          "By CVE ID",
+          "By time",
+          "By filename"
+        ],
+        "explain_en": "CVE is the public primary key."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "l-incident",
+    "kind": "lesson",
+    "category": "处置流程",
+    "cwe": null,
+    "title": "漏洞被利用后的应急响应",
+    "title_en": "Incident Response for Exploited Vulnerabilities",
+    "level": "advanced",
+    "icon": "IR",
+    "color": "process",
+    "summary": "补丁要打，但更重要的是判断攻击者是否已经进来、留下了什么。",
+    "summary_en": "Patching is necessary but insufficient; determine if attackers already entered.",
+    "sections": [
+      {
+        "h": "先定性再处置",
+        "p": "确认漏洞是否真的被利用过。查访问日志中对脆弱接口的异常请求、查是否有异常进程与外连。没有证据时按「未失陷」处理但仍需加固；有证据时立即转入失陷处置流程。",
+        "h_en": "Decide before acting",
+        "p_en": "Confirm whether the vulnerability was actually exploited. Check access logs for anomalous requests to fragile endpoints and look for unusual processes or outbound connections. Without evidence, treat it as not compromised but still harden; with evidence, move immediately into compromise response."
+      },
+      {
+        "h": "取证优先于清理",
+        "p": "清理会破坏证据。先做内存镜像、导出关键日志、记录进程与网络连接快照，再执行隔离与修复。顺序颠倒会导致无法判断影响范围。",
+        "h_en": "Forensics before cleanup",
+        "p_en": "Cleanup destroys evidence. Take memory images, export critical logs, and snapshot processes and network connections before isolation and remediation. Reversing the order makes impact scope indeterminate."
+      },
+      {
+        "h": "遏制与根除",
+        "p": "遏制手段包括隔离主机、封禁出口、吊销相关凭据。注意攻击者可能已建立持久化（计划任务、服务、账号、WebShell），仅打补丁不足以清除，必须逐项排查持久化位置。",
+        "h_en": "Containment and eradication",
+        "p_en": "Containment includes isolating hosts, blocking egress, and revoking related credentials. Note that attackers may already have persistence (scheduled tasks, services, accounts, webshells); patching is insufficient, and every persistence location must be checked."
+      },
+      {
+        "h": "恢复与复盘",
+        "p": "从可信备份恢复或重建系统，而不是在受污染的系统上继续运行。恢复后加强监控一段时间。复盘要产出可执行的改进项：检测规则、架构调整、流程补丁，而不是一份描述性报告。",
+        "h_en": "Recovery and retrospective",
+        "p_en": "Recover from trusted backups or rebuild systems rather than continuing on a compromised host. Strengthen monitoring for a period after recovery. Retrospectives must produce actionable improvements: detection rules, architecture changes, process patches, not descriptive reports."
+      }
+    ],
+    "refs": [
+      {
+        "name": "NIST SP 800-61 Rev.2",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r2/final"
+      },
+      {
+        "name": "CISA Incident Response",
+        "url": "https://www.cisa.gov/topics/cyber-threats-and-advisories/incident-response"
+      }
+    ],
+    "tags": [
+      "应急响应",
+      "处置"
+    ],
+    "quiz": [
+      {
+        "q": "确认漏洞被利用后，第一步应该？",
+        "options": [
+          "立刻打补丁",
+          "取证与判断影响范围",
+          "重启服务",
+          "写报告"
+        ],
+        "answer": 1,
+        "explain": "清理会破坏证据，顺序颠倒将无法定性。",
+        "q_en": "After confirming exploitation, the first step should be?",
+        "options_en": [
+          "Patch immediately",
+          "Preserve evidence and determine scope",
+          "Restart services",
+          "Write a report"
+        ],
+        "explain_en": "Cleanup destroys evidence; reversing the order prevents determination."
+      },
+      {
+        "q": "打补丁后为何还要排查持久化？",
+        "options": [
+          "因为补丁无效",
+          "因为攻击者可能已建立后门/账号/计划任务",
+          "因为版本不符",
+          "因为要留档"
+        ],
+        "answer": 1,
+        "explain": "修洞不等于清除已建立的持久化。",
+        "q_en": "Why check persistence after patching?",
+        "options_en": [
+          "Patches are ineffective",
+          "Attackers may have established backdoors, accounts, or scheduled tasks",
+          "Version mismatch",
+          "For record keeping"
+        ],
+        "explain_en": "Fixing the hole does not remove established persistence."
+      },
+      {
+        "q": "恢复阶段推荐的做法是？",
+        "options": [
+          "在受污染系统上继续运行",
+          "从可信备份恢复或重建系统",
+          "只杀进程",
+          "只改密码"
+        ],
+        "answer": 1,
+        "explain": "受污染系统的可信度无法保证。",
+        "q_en": "Recommended recovery approach?",
+        "options_en": [
+          "Continue on the compromised system",
+          "Restore from trusted backups or rebuild",
+          "Only kill processes",
+          "Only change passwords"
+        ],
+        "explain_en": "A compromised system cannot be trusted."
+      }
+    ],
+    "related": []
+  }
+]

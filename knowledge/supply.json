@@ -1,0 +1,823 @@
+[
+  {
+    "id": "sup-sbom",
+    "kind": "lesson",
+    "category": "供应链安全",
+    "cwe": null,
+    "title": "SBOM 软件物料清单",
+    "title_en": "Software Bill of Materials",
+    "level": "beginner",
+    "icon": "SBOM",
+    "color": "source",
+    "summary": "一份机器可读的组件清单，记录软件里用了哪些第三方库、什么版本、彼此什么依赖关系。没有清单就无法回答\"我到底受不受这个 CVE 影响\"。",
+    "summary_en": "A machine-readable inventory of every third-party component, version and dependency edge. Without it you cannot answer \"am I affected by this CVE\".",
+    "sections": [
+      {
+        "h": "这东西解决什么问题",
+        "p": "Log4j 事件暴露的核心不是漏洞本身，而是没人能在两小时内说清\"我们有哪些服务用了 log4j-core、版本是多少\"。SBOM 就是把这个答案提前准备成文件。它不修复漏洞，它是让你能定位。主流格式有两种：SPDX（Linux 基金会，ISO/IEC 5962）和 CycloneDX（OWASP，ECMA-424），后者对安全场景做了更多扩展，比如 VEX 和 VDR。",
+        "p_en": "The lesson of Log4Shell was not the bug itself but that nobody could answer within two hours which services shipped log4j-core and at what version. An SBOM pre-computes that answer. It fixes nothing; it makes locating possible. Two formats dominate: SPDX (Linux Foundation, ISO/IEC 5962) and CycloneDX (OWASP, ECMA-424), the latter adding security-oriented extensions such as VEX and VDR.",
+        "h_en": "What problem it solves",
+        "code": []
+      },
+      {
+        "h": "最小可用字段",
+        "p": "一份能用的 SBOM 至少要有：组件名、版本、供应者、唯一标识（purl 或 CPE）、以及依赖关系。缺了 purl 就无法和漏洞库自动关联，缺了依赖关系就无法做传递依赖分析。注意\"文件里有\"不等于\"运行时加载了\"——静态清单会高估影响面，这正是 VEX 要补的洞。",
+        "p_en": "A usable SBOM needs at minimum: component name, version, supplier, a unique identifier (purl or CPE), and dependency edges. Without purl you cannot auto-correlate to vulnerability databases; without edges you cannot do transitive analysis. Note that \"listed\" does not mean \"loaded at runtime\" — static inventories overstate impact, which is exactly the gap VEX fills.",
+        "h_en": "Minimum viable fields",
+        "code": []
+      },
+      {
+        "h": "怎么生成",
+        "p": "不要手写。按生态用对应工具在构建阶段自动产出，并让产物和构建号绑定——SBOM 和制品必须是同一次构建的产物，否则它只是猜测。",
+        "p_en": "Never hand-write it. Generate per ecosystem during the build and bind the artifact to the build number; an SBOM must come from the same build as the artifact or it is only a guess.",
+        "h_en": "How to generate it",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "常见生态的生成命令",
+            "bad": "# Maintain an Excel sheet by hand\n# Result: stale in three days, with no idea whether it is complete",
+            "good": "# Node / pnpm\npnpm licenses list --json > /dev/null\nnpx @cyclonedx/cyclonedx-npm --output-file sbom.json\n\n# Python\ncyclonedx-py environment -o sbom.json\n\n# Rust\ncargo cyclonedx --format json\n\n# Container image\nsyft registry:app:1.4.2 -o cyclonedx-json=sbom.json",
+            "note": "关键不是用哪个工具，而是把它放进 CI，与制品同批次产出",
+            "title_en": "Generation commands per ecosystem",
+            "note_en": "What matters is not the tool but wiring it into CI so it ships with the artifact"
+          }
+        ]
+      },
+      {
+        "h": "落地时的三个坑",
+        "p": "一、只做顶层依赖，忽略传递依赖。二、只在发布时生成一次，运行期换了基础镜像就不再更新。三、生成完没人消费——SBOM 的价值在于被漏洞库自动比对，没人读的 SBOM 等于没有。建议接入持续比对：新 CVE 公布时自动回查历史 SBOM。",
+        "p_en": "Three traps: generating top-level only and ignoring transitive deps; generating once at release and never again after a base image swap; and generating something nobody consumes. An SBOM only pays off when automatically matched against vulnerability feeds. Wire continuous re-correlation so a new CVE retro-queries historical SBOMs.",
+        "h_en": "Three traps in practice",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CycloneDX Capabilities",
+        "url": "https://cyclonedx.org/capabilities/"
+      },
+      {
+        "name": "SPDX Specification (ISO/IEC 5962)",
+        "url": "https://spdx.dev/use/specifications/"
+      },
+      {
+        "name": "NTIA SBOM Minimum Elements",
+        "url": "https://www.ntia.gov/report/2021/minimum-elements-software-bill-materials-sbom"
+      }
+    ],
+    "tags": [
+      "供应链",
+      "SBOM",
+      "组件清单",
+      "合规"
+    ],
+    "quiz": [
+      {
+        "q": "SBOM 中最关键的字段是哪一类，缺了它就无法自动关联漏洞库？",
+        "options": [
+          "许可证名称",
+          "组件唯一标识（purl / CPE）",
+          "开发人员姓名",
+          "编译时间戳"
+        ],
+        "answer": 1,
+        "explain": "purl/CPE 是组件与外部漏洞数据之间的连接键，缺了就退化成一份人肉清单。",
+        "q_en": "Which field is essential for automatic vulnerability correlation?",
+        "options_en": [
+          "License name",
+          "A unique component identifier (purl / CPE)",
+          "Developer name",
+          "Build timestamp"
+        ],
+        "explain_en": "purl/CPE is the join key between your inventory and external vulnerability data; without it you have a human-only list."
+      },
+      {
+        "q": "静态 SBOM 显示某库存在，是否等于该库在运行时被加载？",
+        "options": [
+          "等于，清单是准的",
+          "不等于，静态清单会高估实际影响面",
+          "取决于操作系统",
+          "取决于是否开了 ASLR"
+        ],
+        "answer": 1,
+        "explain": "这正是 VEX（漏洞可利用性交换）存在的原因：由供应方声明某组件是否真的受影响。",
+        "q_en": "Does a component listed in a static SBOM mean it is loaded at runtime?",
+        "options_en": [
+          "Yes, the inventory is accurate",
+          "No, static inventories overstate real impact",
+          "Depends on the OS",
+          "Depends on ASLR"
+        ],
+        "explain_en": "This is precisely why VEX exists: the supplier declares whether a component is actually affected."
+      },
+      {
+        "q": "SBOM 应该在什么时候生成？",
+        "options": [
+          "项目立项时生成一次",
+          "与制品同一次构建中自动生成",
+          "出事故后补写",
+          "由采购部门统一填写"
+        ],
+        "answer": 1,
+        "explain": "SBOM 与制品必须同源同批次，否则无法证明对应关系。",
+        "q_en": "When should an SBOM be generated?",
+        "options_en": [
+          "Once at project kickoff",
+          "Automatically during the same build as the artifact",
+          "After an incident, retroactively",
+          "By the procurement department"
+        ],
+        "explain_en": "The SBOM and the artifact must come from the same build, otherwise the correspondence is unprovable."
+      }
+    ]
+  },
+  {
+    "id": "sup-slsa",
+    "kind": "lesson",
+    "category": "供应链安全",
+    "cwe": null,
+    "title": "SLSA 构建等级",
+    "title_en": "SLSA Supply Chain Levels",
+    "level": "intermediate",
+    "icon": "SLSA",
+    "color": "process",
+    "summary": "SLSA 用分级的方式回答一个问题：这个二进制到底是不是从那份源码、在那台构建机上产出的。等级越高，篡改所需的成本越高。",
+    "summary_en": "SLSA grades one question: was this binary really produced from that source on that build platform. Higher levels raise the cost of tampering.",
+    "sections": [
+      {
+        "h": "分级在讲什么",
+        "p": "SLSA v1.0 把体系拆成多条 track，最成熟的是 Build track，分 L0 到 L3。L0 无保证；L1 有 provenance（来源证明）文件，但可以伪造；L2 要求托管构建平台且 provenance 由平台签名，开发者无法私自改；L3 要求加固构建环境，凭据在构建时不可被读取，且 provenance 不可伪造。注意 v1.0 是\"退役\"状态的文档，当前版本号更高，但 L1/L2/L3 的语义没变。",
+        "p_en": "SLSA v1.0 splits the model into tracks; the most mature is Build, with L0 to L3. L0 has no guarantees. L1 has a provenance file that can be forged. L2 requires a hosted build platform that signs provenance, so a developer cannot alter it. L3 requires a hardened build where credentials are unreachable during the build and provenance cannot be forged. Note v1.0 is marked retired and later versions exist, but the L1/L2/L3 semantics hold.",
+        "h_en": "What the levels actually say",
+        "code": []
+      },
+      {
+        "h": "provenance 到底记了什么",
+        "p": "一份 provenance 至少描述：构建由谁触发、用了哪个源的哪个 commit、在什么平台上执行、调用了什么构建步骤、产出物的摘要。它是一份\"构建事实的签名声明\"。校验时做两件事：签名是否可信、声明与手上这个制品的摘要是否一致。任一不成立就拒绝部署。",
+        "p_en": "A provenance attestation states at minimum: who triggered the build, which repo at which commit, on what platform, with which build steps, and the digest of the output. It is a signed claim of build facts. Verification does two things: is the signature trustworthy, and does the claimed digest match the artifact in hand. Fail either and refuse to deploy.",
+        "h_en": "What provenance records",
+        "code": []
+      },
+      {
+        "h": "自测：我在哪一级",
+        "p": "问三个问题就能定位。构建是否在本地开发者笔记本上跑的？是 → L1 以下。provenance 是否由平台自动签发且开发者无法伪造？否 → 停在 L1。构建过程中能否读到长期凭据（比如发布用 token）？能 → 停在 L2。三个都过才是 L3。",
+        "p_en": "Three questions locate you. Is the build running on a developer laptop? Yes means below L1. Is provenance issued by the platform and unforgeable by the developer? No means you stop at L1. Can long-lived credentials (a publish token) be read during the build? Yes means you stop at L2. Pass all three to reach L3.",
+        "h_en": "Self-test: which level am I",
+        "code": []
+      },
+      {
+        "h": "务实推进路线",
+        "p": "不要一上来冲 L3。顺序应该是：先把构建搬到托管 CI（这一步就到 L2 门槛的一半）、再打开平台自带的 provenance 生成、然后把发布凭据换成 OIDC 短期令牌（去掉长期 secret，这一步直接跨到 L3 的关键）、最后在部署侧强制校验。每一步都可以独立验收，不必等全部做完。",
+        "p_en": "Do not sprint at L3. Order matters: move builds to hosted CI first (halfway to L2), enable platform-native provenance, then replace publish credentials with short-lived OIDC tokens (removing long-lived secrets is the key step toward L3), and finally enforce verification at deploy time. Each step is independently verifiable.",
+        "h_en": "A pragmatic path",
+        "code": [
+          {
+            "lang": "yaml",
+            "title": "GitHub Actions 中用 OIDC 取代长期令牌",
+            "bad": "env:\n  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}   # long-lived credential: one leak, total loss",
+            "good": "permissions:\n  id-token: write      # allows requesting short-lived OIDC tokens\n  contents: read\nsteps:\n  - uses: actions/checkout@v4\n  - run: npm publish --provenance --access public\n    # --provenance makes npm record provenance for public verification",
+            "note": "关键差别：令牌由平台按次签发、几分钟过期，构建脚本读不到长期密钥",
+            "title_en": "Replace long-lived tokens with OIDC in GitHub Actions",
+            "note_en": "The difference: tokens are issued per run and expire in minutes, so build scripts never see a long-lived key"
+          }
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "name": "SLSA Security levels",
+        "url": "https://slsa.dev/spec/v1.0/levels"
+      },
+      {
+        "name": "npm provenance",
+        "url": "https://docs.npmjs.com/generating-provenance-statements"
+      },
+      {
+        "name": "Sigstore",
+        "url": "https://www.sigstore.dev/"
+      }
+    ],
+    "tags": [
+      "供应链",
+      "SLSA",
+      "构建安全",
+      "provenance"
+    ],
+    "quiz": [
+      {
+        "q": "SLSA Build L2 相比 L1 的核心增量是什么？",
+        "options": [
+          "产物体积更小",
+          "provenance 由托管平台签发，开发者无法私自伪造",
+          "必须使用容器",
+          "必须开源"
+        ],
+        "answer": 1,
+        "explain": "L1 的 provenance 可以自己写，L2 要求由构建平台签名，才具备可核验性。",
+        "q_en": "What is the core increment of SLSA Build L2 over L1?",
+        "options_en": [
+          "Smaller artifacts",
+          "Provenance is signed by a hosted platform and cannot be forged by the developer",
+          "Containers become mandatory",
+          "The project must be open source"
+        ],
+        "explain_en": "L1 provenance can be self-written; L2 requires platform signing, which is what makes it verifiable."
+      },
+      {
+        "q": "把发布用的长期 token 换成 OIDC 短期令牌，主要消除了什么风险？",
+        "options": [
+          "依赖体积膨胀",
+          "构建过程可读取长期凭据导致的一旦泄露即可长期冒用",
+          "DNS 劫持",
+          "证书过期告警"
+        ],
+        "answer": 1,
+        "explain": "短期令牌按次签发、分钟级过期，即使被日志带出也无法长期复用。",
+        "q_en": "Replacing a long-lived publish token with short-lived OIDC mainly removes which risk?",
+        "options_en": [
+          "Dependency bloat",
+          "A build that can read long-lived credentials, so one leak grants lasting impersonation",
+          "DNS hijacking",
+          "Certificate expiry alerts"
+        ],
+        "explain_en": "A short-lived token is issued per run and expires in minutes; even leaked into logs it cannot be reused for long."
+      },
+      {
+        "q": "校验 provenance 时必须同时检查哪两件事？",
+        "options": [
+          "文件大小和修改时间",
+          "签名是否可信 + 声明摘要与手上制品是否一致",
+          "作者邮箱和提交次数",
+          "镜像层数和压缩算法"
+        ],
+        "answer": 1,
+        "explain": "签名可信但摘要不匹配，说明制品被换过；摘要一致但签名不可信，说明声明可能伪造。",
+        "q_en": "What two things must be verified together for provenance?",
+        "options_en": [
+          "File size and mtime",
+          "Signature trustworthiness plus digest match against the artifact in hand",
+          "Author email and commit count",
+          "Layer count and compression"
+        ],
+        "explain_en": "Trusted signature with a mismatched digest means the artifact was swapped; matching digest with an untrusted signature means the claim may be forged."
+      }
+    ]
+  },
+  {
+    "id": "sup-confusion",
+    "kind": "lesson",
+    "category": "供应链安全",
+    "cwe": "CWE-1104",
+    "title": "依赖混淆攻击",
+    "title_en": "Dependency Confusion",
+    "level": "intermediate",
+    "icon": "CONF",
+    "color": "secret",
+    "summary": "内部包名没有在公共仓库占位时，攻击者在公共仓库注册同名包并给一个更高的版本号，构建系统按\"版本最高\"解析，就会悄悄装上外部代码。",
+    "summary_en": "When an internal package name is unclaimed publicly, an attacker registers the same name at a higher version; resolvers that pick the highest version silently install foreign code.",
+    "sections": [
+      {
+        "h": "攻击成立的条件",
+        "p": "三个条件同时满足才会中招：一、内部包名在公共 registry 上不存在；二、构建配置同时查询内网与公共源；三、解析策略是\"取最高版本\"而不是\"按源优先\"。很多包管理器默认行为恰好就是这样，所以问题出在配置，不在开发者水平。",
+        "p_en": "Three conditions must hold together: the internal name is unclaimed on the public registry; the build queries both private and public sources; and resolution picks the highest version rather than preferring a source. Many package managers default to exactly that, so the flaw is configuration, not developer skill.",
+        "h_en": "Preconditions for the attack",
+        "code": []
+      },
+      {
+        "h": "为什么难发现",
+        "p": "依赖装上了、测试也过了、功能一切正常——恶意包往往只做一件事：把环境变量或 token 外发一次。它不破坏功能，所以不会触发功能测试失败。而且它出现在 lockfile 的一行里，评审时极容易被当作正常变更跳过。",
+        "p_en": "The dependency installs, tests pass, everything works. A malicious package often does one thing only: exfiltrate environment variables or tokens once. It breaks nothing, so functional tests stay green, and it appears as a single lockfile line that reviewers skip as routine.",
+        "h_en": "Why it is hard to notice",
+        "code": []
+      },
+      {
+        "h": "识别信号",
+        "p": "盯三类异常：lockfile 中某个内部包突然出现公共 registry 的下载地址；包名与内部命名规范高度相似但拼写略有差异（这是 typosquatting 的变体）；新依赖的发布时间距今极短且维护者账号是新注册的。把这三条做成 CI 检查比靠人眼可靠得多。",
+        "p_en": "Watch three signals: a lockfile entry for an internal package resolving to a public registry URL; a name suspiciously close to your internal convention but slightly misspelled (a typosquatting variant); a new dependency published days ago by a freshly created maintainer account. Encode these as CI checks rather than relying on eyes.",
+        "h_en": "Detection signals",
+        "code": []
+      },
+      {
+        "h": "修复优先级",
+        "p": "最有效的一步是限定解析源：内部包只允许从私有源解析，公共源不参与该 scope 的解析。其次是把所有内部包名在公共仓库占位（占位包内容为空并声明迁移），成本低但立竿见影。最后才是扫描现有 lockfile 做回溯清理——注意补救时必须重新构建，只删 lockfile 不清缓存可能残留。",
+        "p_en": "The single most effective fix is scoping resolution: internal packages resolve only from the private registry, and the public source does not participate for that scope. Second, claim every internal name publicly with an empty placeholder that declares the move — cheap and immediate. Third, audit existing lockfiles, and remember remediation requires a rebuild; deleting a lockfile without clearing caches may leave residue.",
+        "h_en": "Fix priority",
+        "code": [
+          {
+            "lang": "ini",
+            "title": ".npmrc：把 @corp 作用域锁死在私有源",
+            "bad": "registry=https://registry.npmjs.org/\n@corp:registry=https://registry.npmjs.org/",
+            "good": "registry=https://registry.npmjs.org/\n@corp:registry=https://npm.corp.internal/\n# The private scope resolves only from the private registry\nstrict-ssl=true",
+            "note": "关键在作用域绑定，而不是整体禁用公共源——你仍然需要公共依赖",
+            "title_en": ".npmrc: pin the @corp scope to the private registry",
+            "note_en": "Scope binding is the point, not banning the public registry — you still need public dependencies"
+          },
+          {
+            "lang": "toml",
+            "title": "Cargo：用 source replacement 固定来源",
+            "bad": "[dependencies]\ninternal-utils = \"1.0\"   # no source constraint, so a same-named crates.io package can match",
+            "good": "[source.crates-io]\nreplace-with = \"corp\"\n\n[source.corp]\nregistry = \"https://cargo.corp.internal/index\"",
+            "note": "替换源后所有解析都走内网，同名包无法从公网混入",
+            "title_en": "Cargo: pin sources with source replacement",
+            "note_en": "With the source replaced all resolution stays internal, so a same-name package cannot slip in"
+          }
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE-1104: Use of Unmaintained Third Party Components",
+        "url": "https://cwe.mitre.org/data/definitions/1104.html"
+      },
+      {
+        "name": "npm scopes documentation",
+        "url": "https://docs.npmjs.com/cli/using-npm/scope"
+      },
+      {
+        "name": "CISA ICT Supply Chain Security",
+        "url": "https://www.cisa.gov/topics/cyber-threats-and-advisories/information-communications-technology-supply-chain"
+      }
+    ],
+    "tags": [
+      "供应链",
+      "依赖混淆",
+      "包管理",
+      "CI"
+    ],
+    "quiz": [
+      {
+        "q": "依赖混淆攻击能够成立，最关键的前提是什么？",
+        "options": [
+          "攻击者拥有内网权限",
+          "内部包名在公共仓库未被占用",
+          "目标使用了容器",
+          "目标使用 HTTPS"
+        ],
+        "answer": 1,
+        "explain": "名字一旦被占位，攻击者就无法在公共源注册同名的高版本包。",
+        "q_en": "What is the most critical precondition for dependency confusion?",
+        "options_en": [
+          "The attacker has internal network access",
+          "The internal package name is unclaimed on the public registry",
+          "The target uses containers",
+          "The target uses HTTPS"
+        ],
+        "explain_en": "Once the name is claimed, the attacker can no longer register a higher-version package with that name publicly."
+      },
+      {
+        "q": "最有效的修复方式是哪一种？",
+        "options": [
+          "在代码里加注释提醒",
+          "把内部作用域绑定到私有源，公共源不参与该作用域解析",
+          "每周人工检查 lockfile",
+          "关闭所有第三方依赖"
+        ],
+        "answer": 1,
+        "explain": "作用域绑定从解析层面消除了混入可能，是根治；人工检查只能降低概率。",
+        "q_en": "Which fix is most effective?",
+        "options_en": [
+          "Adding a code comment warning",
+          "Binding the internal scope to the private registry so the public source never resolves it",
+          "Manually reviewing lockfiles weekly",
+          "Removing all third-party dependencies"
+        ],
+        "explain_en": "Scope binding removes the possibility at resolution time; manual review only lowers probability."
+      },
+      {
+        "q": "为什么这类恶意包通常不会让功能测试失败？",
+        "options": [
+          "因为它编译更快",
+          "因为它只做一次凭据外发，不改变功能行为",
+          "因为测试环境不联网",
+          "因为包管理器会跳过它"
+        ],
+        "answer": 1,
+        "explain": "不改变功能就不触发功能断言，所以必须靠来源校验和 lockfile 差异检查来发现。",
+        "q_en": "Why do such malicious packages usually keep functional tests green?",
+        "options_en": [
+          "They compile faster",
+          "They only exfiltrate credentials once without changing behavior",
+          "Test environments are offline",
+          "The package manager skips them"
+        ],
+        "explain_en": "Behavior is unchanged so functional assertions do not fire; only source verification and lockfile diffing catch it."
+      }
+    ]
+  },
+  {
+    "id": "sup-transitive",
+    "kind": "lesson",
+    "category": "供应链安全",
+    "cwe": "CWE-1104",
+    "title": "传递依赖与幽灵依赖",
+    "title_en": "Transitive and Phantom Dependencies",
+    "level": "intermediate",
+    "icon": "DEEP",
+    "color": "parse",
+    "summary": "你只声明了 12 个直接依赖，实际装进项目的是 800 个包。绝大多数漏洞来自你从没在 package.json 里写过的那些。",
+    "summary_en": "You declared 12 direct dependencies; 800 packages actually shipped. Most vulnerabilities live in ones you never wrote down.",
+    "sections": [
+      {
+        "h": "依赖树的真实形状",
+        "p": "现代包管理器把每个直接依赖的整棵子树都拉进来，同一库的不同版本可能并存多份。这带来两个后果：漏洞影响面远大于直觉；同一个 CVE 可能在树里出现多次，需按实际解析版本判断。\"幽灵依赖\"是另一种形态：代码 import 了某个包，但 package.json 里没写，只是恰好被别的依赖间接装上了——一旦上游更新，构建就断。",
+        "p_en": "Modern package managers pull the whole subtree of each direct dependency, and multiple versions of a library can coexist. Two consequences: the blast radius is far larger than intuition suggests, and the same CVE may appear several times, so severity must be judged per resolved version. Phantom dependencies are a related shape: code imports a package that package.json never declares, merely installed indirectly — an upstream change then breaks the build.",
+        "h_en": "The real shape of the tree",
+        "code": []
+      },
+      {
+        "h": "怎么量化",
+        "p": "不要用\"大约\"描述依赖规模。跑一次统计，把直接数、传递数、去重后数、含已知漏洞数分别记下来。这四个数字是你和评审、和老板沟通的唯一有效语言。",
+        "p_en": "Never describe dependency size with \"about\". Measure once and record direct count, transitive count, deduplicated count, and count with known vulnerabilities. Those four numbers are the only useful language for a review or a manager.",
+        "h_en": "How to quantify",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "四个必须记住的数字",
+            "bad": "# \"About a few hundred packages\" — useless for a decision",
+            "good": "# 1) direct dependency count\ngrep -c \"\\\"\" package.json\n\n# 2) actually installed count (incl. transitive)\nls node_modules | wc -l\n\n# 3) unique package count after dedup\npnpm list --depth Infinity --json | jq \"[.. | .name? // empty] | unique | length\"\n\n# 4) packages with known vulnerabilities\npnpm audit --json | jq \".advisories | length\"",
+            "note": "2 和 3 的差距说明同一包存在多份副本，这是升级困难的根因之一",
+            "title_en": "Four numbers worth remembering",
+            "note_en": "The gap between 2 and 3 shows duplicate copies, one root cause of upgrade difficulty"
+          }
+        ]
+      },
+      {
+        "h": "收敛依赖的手段",
+        "p": "按成本从低到高：锁定版本并提交 lockfile（最低成本、最容易被忽略）；在 CI 里加 resolutions/overrides 把危险传递依赖强制提升到安全版本；定期做依赖去重；对重量级依赖做替换评估。注意 overrides 属于\"止血\"，长期应与上游沟通升级，否则会一直背着一个分叉。",
+        "p_en": "Cheapest first: pin versions and commit the lockfile (lowest cost, most often skipped); use resolutions/overrides in CI to force a vulnerable transitive dependency to a safe version; periodically deduplicate; and evaluate replacing heavy dependencies. Note that overrides are a tourniquet — long term you must push the upstream to upgrade or you permanently carry a fork.",
+        "h_en": "Ways to converge",
+        "code": [
+          {
+            "lang": "json",
+            "title": "pnpm overrides 强制提升传递依赖",
+            "bad": "{\n  \"dependencies\": { \"some-lib\": \"^2.0.0\" }\n  // That library pins a vulnerable old minimist internally\n}",
+            "good": "{\n  \"dependencies\": { \"some-lib\": \"^2.0.0\" },\n  \"pnpm\": {\n    \"overrides\": {\n      \"minimist@<1.2.6\": \"1.2.8\"\n    }\n  }\n}",
+            "note": "版本范围要写清楚，否则会把未来所有版本都钉死",
+            "title_en": "pnpm overrides to force a safe transitive version",
+            "note_en": "Write the version range precisely or you pin every future release"
+          }
+        ]
+      },
+      {
+        "h": "持续治理而不是一次性扫描",
+        "p": "依赖漏洞是流动的：今天干净的项目明天可能因为新 CVE 公布而中招。因此治理动作必须周期化：每周自动跑一次审计并比对上周结果，只处理\"新增\"部分——这样每周的实际工作量是可控的几条，而不是几百条的历史债。",
+        "p_en": "Dependency risk flows: a clean project today can be hit tomorrow by a newly published CVE. Governance must therefore be periodic: run the audit weekly and diff against last week, handling only the new entries. That keeps weekly effort to a few items instead of hundreds of legacy findings.",
+        "h_en": "Continuous governance, not one-off scans",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Dependency-Check",
+        "url": "https://owasp.org/www-project-dependency-check/"
+      },
+      {
+        "name": "pnpm overrides",
+        "url": "https://pnpm.io/package_json#pnpmoverrides"
+      },
+      {
+        "name": "CWE-1104",
+        "url": "https://cwe.mitre.org/data/definitions/1104.html"
+      }
+    ],
+    "tags": [
+      "供应链",
+      "依赖管理",
+      "传递依赖",
+      "审计"
+    ],
+    "quiz": [
+      {
+        "q": "评估某个 CVE 对本项目的影响时，最可靠的依据是什么？",
+        "options": [
+          "直接依赖列表里有没有它",
+          "依赖树中实际解析到的版本是否落在受影响区间",
+          "包名是否眼熟",
+          "作者是否知名"
+        ],
+        "answer": 1,
+        "explain": "同一库可能有多份副本，必须按实际解析版本判断，而不是看顶层声明。",
+        "q_en": "What is the most reliable basis for judging a CVE impact on your project?",
+        "options_en": [
+          "Whether it appears in the direct dependency list",
+          "Whether the version actually resolved in the dependency tree falls in the affected range",
+          "Whether the package name looks familiar",
+          "Whether the author is well known"
+        ],
+        "explain_en": "The same library can exist in several copies; judge by the resolved version, not the top-level declaration."
+      },
+      {
+        "q": "\"幽灵依赖\"最典型的后果是什么？",
+        "options": [
+          "程序运行变慢",
+          "代码 import 了一个未声明的包，上游变更后构建直接断裂",
+          "安装包体积翻倍",
+          "许可证冲突"
+        ],
+        "answer": 1,
+        "explain": "它能跑只是因为恰好被间接装上，属于隐性契约，随时可能失效。",
+        "q_en": "What is the typical consequence of a phantom dependency?",
+        "options_en": [
+          "Slower runtime",
+          "Code imports an undeclared package and the build breaks when upstream changes",
+          "Installer size doubles",
+          "License conflict"
+        ],
+        "explain_en": "It only works because something else installed it indirectly — an implicit contract that can vanish at any time."
+      },
+      {
+        "q": "为什么依赖治理要按\"每周新增\"而不是\"全量\"处理？",
+        "options": [
+          "因为全量扫描收费",
+          "因为漏洞集合持续变化，只看增量才能把工作量控制在可执行范围",
+          "因为旧漏洞不重要",
+          "因为审计工具不支持全量"
+        ],
+        "answer": 1,
+        "explain": "历史债一次清不完，增量治理能保证每周都有真实收敛。",
+        "q_en": "Why govern by weekly delta rather than full backlog?",
+        "options_en": [
+          "Full scans cost money",
+          "The vulnerability set keeps changing; only a delta keeps the workload executable",
+          "Old vulnerabilities do not matter",
+          "Tools cannot scan everything"
+        ],
+        "explain_en": "Legacy debt cannot be cleared at once; delta governance guarantees real convergence every week."
+      }
+    ]
+  },
+  {
+    "id": "sup-artifact-sign",
+    "kind": "lesson",
+    "category": "供应链安全",
+    "cwe": "CWE-345",
+    "title": "制品签名与来源校验",
+    "title_en": "Artifact Signing and Provenance Verification",
+    "level": "intermediate",
+    "icon": "SIGN",
+    "color": "crypto",
+    "summary": "签名本身不保证安全，保证安全的是\"部署前强制校验\"这个动作。没有校验的签名只是一串更长的哈希。",
+    "summary_en": "A signature alone guarantees nothing; the guarantee comes from enforcing verification before deploy. An unverified signature is just a longer hash.",
+    "sections": [
+      {
+        "h": "签什么、谁来验",
+        "p": "典型的签名体系包含三部分：签名者身份（用 OIDC 身份而不是长期私钥）、被签对象（制品的摘要而非文件本身）、以及校验方（部署流水线或最终用户）。三者缺一不可。很多团队做了第一步就宣布\"已签名\"，但校验环节空着，等于零收益。",
+        "p_en": "A typical signing chain has three parts: signer identity (an OIDC identity rather than a long-lived private key), the signed object (a digest, not the file), and the verifier (the deploy pipeline or end user). All three are required. Many teams complete step one and declare victory while the verification step is empty, which yields zero benefit.",
+        "h_en": "What is signed and who verifies",
+        "code": []
+      },
+      {
+        "h": "keyless 签名怎么做到不依赖私钥",
+        "p": "Sigstore 的 keyless 模式用短期证书把\"这次构建的身份\"和\"这次签名\"绑定，证书本身几分钟就过期，签名事件被写进透明日志（Rekor）供公开审计。校验时不是问\"这个公钥可信吗\"，而是问\"签名时的身份是不是我信任的那个工作流，并且日志里确实有这条记录\"。这把信任锚从密钥管理换成了身份与透明度。",
+        "p_en": "Sigstore keyless binds the build identity to a signature via a short-lived certificate that expires in minutes, and records the event in a public transparency log (Rekor). Verification no longer asks \"is this public key trusted\" but \"was the signing identity the workflow I trust, and is the entry really in the log\". The trust anchor moves from key management to identity plus transparency.",
+        "h_en": "How keyless signing avoids private keys",
+        "code": []
+      },
+      {
+        "h": "强制校验的写法",
+        "p": "校验必须写在部署路径上，不能做成\"可选脚本\"。判断条件要写死到具体的工作流身份与仓库，不能只写\"签名有效\"。",
+        "p_en": "Verification belongs on the deploy path, never as an optional script. Pin the condition to a specific workflow identity and repository; never accept merely \"signature valid\".",
+        "h_en": "How to enforce verification",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "cosign 校验镜像来源",
+            "bad": "# Only checks that a signature exists\ncosign verify app:1.4.2   # anyone signature passes",
+            "good": "cosign verify app:1.4.2 \\\n  --certificate-identity-regexp \\\n    \"^https://github.com/acme/app/.github/workflows/release.yml@refs/tags/v.*$\" \\\n  --certificate-oidc-issuer https://token.actions.githubusercontent.com",
+            "note": "必须限定\"谁签的\"，否则攻击者自己签一个也能过",
+            "title_en": "cosign verifying image provenance",
+            "note_en": "You must pin who signed it, or an attacker simply signs their own"
+          }
+        ]
+      },
+      {
+        "h": "这套东西对你的实际成本",
+        "p": "如果项目只是个人工具，完整 SLSA L3 不现实。但有一个低成本高收益的折中：给自己的发布包生成 SHA-256 摘要并公开在发布页，同时用 OIDC 让 CI 自动发布而不是本机手动上传。前一条让用户能校验完整性，后一条去掉了本机凭据泄露的风险。两条加起来半天工作量。",
+        "p_en": "Full SLSA L3 is unrealistic for a personal tool. A cheap high-value compromise: publish a SHA-256 digest for every release artifact on the release page, and let CI publish via OIDC instead of uploading manually from a laptop. The first lets users verify integrity; the second removes laptop credential exposure. Half a day of work total.",
+        "h_en": "The real cost for a small project",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "Sigstore",
+        "url": "https://www.sigstore.dev/"
+      },
+      {
+        "name": "cosign verify documentation",
+        "url": "https://docs.sigstore.dev/cosign/verifying/verify/"
+      },
+      {
+        "name": "CWE-345: Insufficient Verification of Data Authenticity",
+        "url": "https://cwe.mitre.org/data/definitions/345.html"
+      }
+    ],
+    "tags": [
+      "供应链",
+      "签名",
+      "Sigstore",
+      "完整性"
+    ],
+    "quiz": [
+      {
+        "q": "只对制品做了签名但部署时不校验，实际安全收益是什么？",
+        "options": [
+          "等同于完整防护",
+          "接近零，因为没有校验的签名不会被任何环节拒绝",
+          "能防住所有供应链攻击",
+          "只影响合规评分"
+        ],
+        "answer": 1,
+        "explain": "签名的价值来自\"不通过就拒绝部署\"这个强制点，没有它签名只是记录。",
+        "q_en": "If you sign artifacts but never verify at deploy, what is the real security benefit?",
+        "options_en": [
+          "Equivalent to full protection",
+          "Near zero, because nothing ever rejects on a failed check",
+          "Stops all supply chain attacks",
+          "Only affects compliance scoring"
+        ],
+        "explain_en": "The value comes from the enforcement point where a failed check blocks deployment; without it a signature is only a record."
+      },
+      {
+        "q": "keyless 签名把信任锚放在了什么之上？",
+        "options": [
+          "长期私钥的保密性",
+          "短期证书绑定的构建身份 + 透明日志的公开可审计性",
+          "内部 CA 的层级",
+          "代码混淆"
+        ],
+        "answer": 1,
+        "explain": "校验问的是\"是不是我信任的那个工作流签的，日志里有没有这条\"，而不是\"这个公钥认不认识\"。",
+        "q_en": "What does keyless signing anchor trust in?",
+        "options_en": [
+          "Secrecy of a long-lived private key",
+          "A build identity bound by a short-lived certificate plus public auditability of the transparency log",
+          "The depth of an internal CA hierarchy",
+          "Code obfuscation"
+        ],
+        "explain_en": "Verification asks \"was this signed by the workflow I trust, and is it in the log\", not \"do I recognize this key\"."
+      },
+      {
+        "q": "校验镜像签名时，最容易犯的错误是什么？",
+        "options": [
+          "忘了检查文件大小",
+          "只验证签名存在，不限定签名者身份",
+          "没有使用 HTTPS",
+          "没有压缩镜像"
+        ],
+        "answer": 1,
+        "explain": "不限定身份的校验等于接受任何人的签名，攻击者可以给自己重新签一个。",
+        "q_en": "What is the easiest mistake when verifying image signatures?",
+        "options_en": [
+          "Forgetting to check file size",
+          "Verifying only that a signature exists without pinning signer identity",
+          "Not using HTTPS",
+          "Not compressing the image"
+        ],
+        "explain_en": "Unpinned verification accepts anyone signatures; an attacker can simply sign their own build."
+      }
+    ]
+  },
+  {
+    "id": "sup-ci-secret",
+    "kind": "lesson",
+    "category": "供应链安全",
+    "cwe": "CWE-798",
+    "title": "CI/CD 流水线凭据泄露",
+    "title_en": "CI/CD Pipeline Credential Leaks",
+    "level": "intermediate",
+    "icon": "CISEC",
+    "color": "secret",
+    "summary": "构建流水线通常同时握有三样东西：源码读权限、制品写权限、以及部署环境的凭据。它天然是供应链里最值钱的攻击目标。",
+    "summary_en": "A build pipeline typically holds source read access, artifact write access, and deploy credentials at once — making it the highest-value target in the chain.",
+    "sections": [
+      {
+        "h": "泄露的六种常见路径",
+        "p": "一、把 secret 直接写进 workflow 文件（历史提交里永久留存）。二、日志中打印环境变量或调试输出。三、PR 触发的 workflow 拿到仓库 secret——这是最危险的一类，因为外部贡献者可以改代码去读它。四、第三方 action 的 tag 被回头篡改（应固定到 commit SHA）。五、缓存投毒：缓存被跨分支共享，攻击者写入后主分支读到。六、自建 runner 上残留的凭据文件。",
+        "p_en": "Six common paths: secrets committed into workflow files and retained forever in history; environment variables or debug dumps printed to logs; PR-triggered workflows receiving repository secrets, the most dangerous case since an outside contributor can edit code to read them; third-party actions whose tag is later repointed (pin to a commit SHA); cache poisoning where a shared cache is written by one branch and read by the main branch; and credential files left on self-hosted runners.",
+        "h_en": "Six common leak paths",
+        "code": []
+      },
+      {
+        "h": "为什么 PR 触发的流水线最危险",
+        "p": "pull_request 事件在 fork 上下文中默认拿不到 secret，这是平台的安全设计。但一旦为了\"方便测试\"改成 pull_request_target 或 workflow_run，代码来自不可信来源而 secret 仍然注入，就等于把钥匙交给提交者。这个改动往往只改一行，评审很难察觉。",
+        "p_en": "The pull_request event deliberately withholds secrets in fork context. The moment someone switches to pull_request_target or workflow_run for convenience, untrusted code runs with secrets injected — handing over the keys. The change is usually a single line and easy to miss in review.",
+        "h_en": "Why PR-triggered pipelines are riskiest",
+        "code": []
+      },
+      {
+        "h": "加固清单",
+        "p": "按投入产出排：默认给 workflow 最小权限（显式写 permissions）；所有第三方 action 固定到 commit SHA；secret 只在需要的 job 内可见，不在全局 env 里；用 OIDC 换短期云凭据替代长期 AK；开启 secret 扫描并阻断推送；定期轮换已暴露的凭据——历史上泄露过的 token 即使删除提交也仍然有效。",
+        "p_en": "Ordered by return on effort: default to minimal workflow permissions (write them explicitly); pin all third-party actions to a commit SHA; scope secrets to the specific job rather than global env; replace long-lived cloud keys with OIDC-issued short-lived credentials; enable secret scanning with push blocking; and rotate anything ever exposed — a token leaked in history remains valid even after the commit is deleted.",
+        "h_en": "Hardening checklist",
+        "code": [
+          {
+            "lang": "yaml",
+            "title": "最小权限 + 固定 action 版本",
+            "bad": "on: pull_request_target\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@main   # floating reference\n      - uses: some/action@v1          # the tag can be repointed elsewhere",
+            "good": "permissions:\n  contents: read        # read-only by default, declared explicitly\non: pull_request\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # pinned SHA\n      - uses: some/action@a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+            "note": "两条改动：不给 PR 上下文注入 secret，以及让 action 版本不可被悄悄替换",
+            "title_en": "Minimal permissions plus pinned action versions",
+            "note_en": "Two changes: no secrets in the PR context, and action versions that cannot be swapped silently"
+          }
+        ]
+      },
+      {
+        "h": "自查方法",
+        "p": "用 git 历史全文检索常见前缀（ghp_、AKIA、xoxb-、sk-），命中的一律视为已泄露并立即轮换，不要试图判断\"是否还有效\"。同时检查所有 workflow 文件里的触发事件，凡出现 pull_request_target 或 workflow_run 且 checkout 了 PR 分支的，逐条人工复核。",
+        "p_en": "Full-text search git history for common prefixes (ghp_, AKIA, xoxb-, sk-) and treat every hit as leaked; rotate immediately rather than debating whether it still works. Then review every workflow trigger: any pull_request_target or workflow_run that checks out the PR branch deserves line-by-line manual review.",
+        "h_en": "How to self-audit",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "在完整 git 历史中检索",
+            "bad": "grep -r \"token\" .        # workspace only: leaks in history stay invisible",
+            "good": "git rev-list --all | while read c; do\n  git grep -nE \"(ghp_|AKIA|xoxb-|sk-[A-Za-z0-9]{20,})\" \"$c\" 2>/dev/null \\\n    && echo \"FOUND in $c\"\ndone",
+            "note": "一旦命中就轮换凭据，删除历史改写只能处理可见性，不能恢复保密性",
+            "title_en": "Search the entire git history",
+            "note_en": "On any hit, rotate: rewriting history changes visibility, not secrecy"
+          }
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "name": "GitHub Actions security hardening",
+        "url": "https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions"
+      },
+      {
+        "name": "CWE-798: Use of Hard-coded Credentials",
+        "url": "https://cwe.mitre.org/data/definitions/798.html"
+      },
+      {
+        "name": "OpenSSF Scorecard",
+        "url": "https://securityscorecards.dev/"
+      }
+    ],
+    "tags": [
+      "供应链",
+      "CI/CD",
+      "凭据",
+      "GitHub Actions"
+    ],
+    "quiz": [
+      {
+        "q": "为什么 pull_request_target 事件比 pull_request 危险？",
+        "options": [
+          "它执行更慢",
+          "它在注入仓库 secret 的同时允许不可信来源的代码运行",
+          "它不支持缓存",
+          "它只能跑在自建 runner 上"
+        ],
+        "answer": 1,
+        "explain": "外部贡献者可以改代码去读取并外发 secret，这是设计上的权限叠加问题。",
+        "q_en": "Why is pull_request_target riskier than pull_request?",
+        "options_en": [
+          "It is slower",
+          "It injects repository secrets while allowing untrusted-source code to run",
+          "It does not support caching",
+          "It only runs on self-hosted runners"
+        ],
+        "explain_en": "An outside contributor can edit code to read and exfiltrate the secrets — a design-level privilege composition problem."
+      },
+      {
+        "q": "第三方 action 引用应该怎么写？",
+        "options": [
+          "@main 最新版",
+          "@v1 大版本 tag",
+          "固定到具体 commit SHA",
+          "直接内联整段脚本"
+        ],
+        "answer": 2,
+        "explain": "tag 可以被维护者回头指向别的 commit，SHA 不可变。",
+        "q_en": "How should a third-party action be referenced?",
+        "options_en": [
+          "@main for latest",
+          "@v1 major tag",
+          "Pinned to a specific commit SHA",
+          "Inlined as a whole script"
+        ],
+        "explain_en": "Tags can be repointed by the maintainer; a commit SHA cannot."
+      },
+      {
+        "q": "在 git 历史中发现一个已删除的 token，正确处理是？",
+        "options": [
+          "删掉提交就算修好",
+          "立即轮换该 token，因为泄露过的凭据仍然有效",
+          "改成私有仓库即可",
+          "在 README 里声明"
+        ],
+        "answer": 1,
+        "explain": "删除历史只改变可见性，不恢复保密性；轮换才是真正的止损动作。",
+        "q_en": "You find a deleted token in git history. What is the correct action?",
+        "options_en": [
+          "Deleting the commit fixes it",
+          "Rotate the token immediately; an exposed credential is still valid",
+          "Making the repo private is enough",
+          "Declare it in the README"
+        ],
+        "explain_en": "Rewriting history changes visibility, not secrecy; rotation is the only real containment."
+      }
+    ]
+  }
+]

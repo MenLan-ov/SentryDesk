@@ -1,0 +1,1058 @@
+[
+  {
+    "id": "intel-cvss4",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "CVSS v4.0 的变化",
+    "title_en": "What Changed in CVSS v4.0",
+    "level": "advanced",
+    "icon": "CV4",
+    "color": "assess",
+    "summary": "v4.0 把评分从\"一套指标算一个分\"改成\"基础指标 + 可选的威胁与环境上下文\"，并首次把评估对象从应用扩展到工控与安全设备。",
+    "summary_en": "v4.0 moves from one metric set producing one score to base metrics plus optional threat and environmental context, and extends scoping beyond applications to ICS and safety devices.",
+    "sections": [
+      {
+        "h": "结构上的三个变化",
+        "h_en": "Three structural changes",
+        "p": "一、基础指标换了构成：把 v3 的\"影响子分数\"拆成易受攻击系统与后续系统两组，多了一个\"后续系统影响\"的概念，能表达\"攻破这台设备之后影响到别的系统\"。二、威胁指标成为正式的一等指标，包括利用成熟度，而不像 v3 那样只是环境指标下的一个子项。三、环境指标支持按\"受保护系统有多重要\"做加权，而不是简单调整三个系数。",
+        "p_en": "Base metrics changed shape: v3 impact sub-score splits into vulnerable-system and subsequent-system groups, adding a notion of downstream impact so a compromised device affecting other systems is expressible. Threat metrics became first-class, including exploit maturity, rather than a sub-item under environmental. Environmental metrics weight by how important the protected system is.",
+        "code": []
+      },
+      {
+        "h": "为什么专家系统导致分数不可比",
+        "h_en": "Why scores are not comparable across v3 and v4",
+        "p": "v4.0 引入了一组\"补充指标\"，其中安全相关的部分由厂商或评估者自行判断，同一漏洞不同评估者可能给出不同分数。更关键的是 v4 的分数与 v3 的分数在语义上不能直接比较：同样是 9.0，两者权重设计不同。因此在做趋势统计时必须区分版本，不能把 v3 与 v4 的分数混在同一条时间线上画图。",
+        "p_en": "v4.0 adds supplemental metrics where safety-related judgments are left to the vendor or assessor, so two assessors can score the same flaw differently. More importantly, v4 and v3 scores are not semantically comparable: the same 9.0 rests on different weighting. Trend statistics must separate versions rather than plotting both on one line.",
+        "code": []
+      },
+      {
+        "h": "在系统里怎么存",
+        "h_en": "How to store it",
+        "p": "不要只存一个浮点数。至少存四样：向量字符串、版本号、分数、以及评分来源。理由很实际：向量字符串才能解释\"为什么是这个分\"，版本号决定能否比较，来源决定可信度。只存分数会导致后续无法回溯，也无法在版本换算时重新计算。",
+        "p_en": "Never store only a float. Store four things: the vector string, the version, the score, and the source. The vector explains why a score is what it is, the version determines comparability, and the source determines trust. Score-only storage is unauditable and blocks recomputation across versions.",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "存储结构：向量与分数分开，版本必须落库",
+            "bad": "CREATE TABLE items (\n  cve TEXT,\n  cvss REAL            -- score only: cannot explain or convert\n);",
+            "good": "CREATE TABLE items (\n  cve TEXT,\n  cvss_score REAL,          -- numeric, used for sorting\n  cvss_vector TEXT,         -- vector string, used to explain and recompute\n  cvss_version TEXT,        -- 3.0 / 3.1 / 4.0\n  cvss_source TEXT          -- NVD / vendor advisory / self-assessed\n);",
+            "note": "四个字段缺一，后续要么无法排序，要么无法解释，要么无法比较",
+            "title_en": "Schema: separate vector from score and store the version",
+            "note_en": "Lose any of the four fields and you cannot sort, explain or compare"
+          }
+        ]
+      },
+      {
+        "h": "实际使用建议",
+        "h_en": "Practical guidance",
+        "p": "如果你的数据主要来自公开库，多数条目仍会是 v3.1。此时不要在展示层伪造 v4 分数。正确做法是：按版本分组展示、在趋势图上只比较同版本序列、并且明确标注\"该分值为 v3.1\"，让读者知道不可跨版本比较。诚实的标注比统一的漂亮数字更有用。",
+        "p_en": "If your data comes mainly from public feeds, most entries remain v3.1. Never fabricate v4 scores in the display layer. Group by version, compare only same-version series in trend charts, and label the version explicitly so readers know cross-version comparison is invalid. Honest labeling beats uniform pretty numbers.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CVSS v4.0 Specification",
+        "url": "https://www.first.org/cvss/v4.0/specification-document"
+      },
+      {
+        "name": "CVSS v4.0 User Guide",
+        "url": "https://www.first.org/cvss/v4.0/user-guide"
+      },
+      {
+        "name": "CVSS v3.1 Specification",
+        "url": "https://www.first.org/cvss/v3.1/specification-document"
+      }
+    ],
+    "tags": [
+      "CVSS",
+      "评分",
+      "漏洞评估",
+      "标准"
+    ],
+    "quiz": [
+      {
+        "q": "CVSS v4.0 相比 v3.1，在指标结构上最显著的变化是？",
+        "options": [
+          "取消了时间指标",
+          "威胁指标成为一等指标，并引入后续系统影响的概念",
+          "只保留一个总分",
+          "改为百分制"
+        ],
+        "answer": 1,
+        "explain": "v4 让威胁上下文正式参与评分，并能表达攻破一台设备后对下游系统的影响。",
+        "q_en": "What is the most notable metric-structure change in CVSS v4.0 versus v3.1?",
+        "options_en": [
+          "Temporal metrics removed",
+          "Threat metrics became first-class and downstream system impact was introduced",
+          "Only one total score remains",
+          "It moved to a percentage scale"
+        ],
+        "explain_en": "v4 makes threat context part of scoring and can express downstream impact after a device is compromised."
+      },
+      {
+        "q": "为什么不能把 v3.1 与 v4.0 的分数放在同一条趋势线上比较？",
+        "options": [
+          "因为小数位不同",
+          "因为两者的权重设计不同，同一数值语义不等价",
+          "因为 v4 只用于工控",
+          "因为 v3 已停用"
+        ],
+        "answer": 1,
+        "explain": "分数看起来一样，背后的权重模型不同，跨版本比较会得出错误结论。",
+        "q_en": "Why must v3.1 and v4.0 scores not share one trend line?",
+        "options_en": [
+          "Different decimal places",
+          "Their weighting models differ, so equal numbers are not equivalent",
+          "v4 only applies to ICS",
+          "v3 is retired"
+        ],
+        "explain_en": "The numbers look alike but rest on different weighting, so cross-version comparison yields wrong conclusions."
+      },
+      {
+        "q": "存储 CVSS 时至少需要哪几项？",
+        "options": [
+          "只需要分数",
+          "分数、向量串、版本、来源",
+          "只需要向量串",
+          "只需要版本"
+        ],
+        "answer": 1,
+        "explain": "分数排序、向量解释、版本决定可比性、来源决定可信度，缺一不可。",
+        "q_en": "What must be stored at minimum for CVSS?",
+        "options_en": [
+          "Score only",
+          "Score, vector string, version, and source",
+          "Vector string only",
+          "Version only"
+        ],
+        "explain_en": "Score sorts, vector explains, version determines comparability, source determines trust."
+      }
+    ]
+  },
+  {
+    "id": "intel-kev",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "已知被利用漏洞名录的用法",
+    "title_en": "Using a Known-Exploited Vulnerability Catalog",
+    "level": "beginner",
+    "icon": "KEV",
+    "color": "process",
+    "summary": "已知被利用名录回答的是\"这个漏洞在野外真的被用过了吗\"。它比任何预测模型都硬，因为它记录的是已发生的事实。",
+    "summary_en": "A known-exploited catalog answers whether a vulnerability has actually been exploited in the wild. It is harder evidence than any predictive model because it records facts.",
+    "sections": [
+      {
+        "h": "它和预测模型的分工",
+        "h_en": "How it differs from predictive models",
+        "p": "已知被利用名录是事实记录：某漏洞已被观察到在实际攻击中使用，附带加入日期与处置期限。预测模型是概率估计：某漏洞未来可能被利用。两者组合的逻辑是先事实后概率——凡在名录中的，无需再讨论概率，直接按最高优先级处理；不在名录中的，才用概率排序。",
+        "p_en": "A known-exploited catalog is a record of fact: this flaw has been observed in real attacks, with an added date and a remediation deadline. A predictive model is an estimate. Combine them fact-first: anything in the catalog needs no probability discussion and goes straight to top priority; only the rest falls back to probability ranking.",
+        "code": []
+      },
+      {
+        "h": "为什么它对优先级排序如此有效",
+        "h_en": "Why it is so effective for prioritization",
+        "p": "因为漏洞利用的分布极度不均：少数漏洞承担了绝大多数实际攻击。按名录筛选相当于直接把注意力集中到那一小撮上，天然把待办从几百条压到几条。这也解释了为什么在很多组织里，仅接入这一个数据源的收益，比接入十个漏洞库还要大。",
+        "p_en": "Exploitation is extremely skewed: a small minority of vulnerabilities carries the vast majority of real attacks. Filtering by the catalog concentrates attention on that minority and collapses a backlog of hundreds into a handful. This explains why one such feed often delivers more value than ten raw vulnerability databases.",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "事实优先的查询：名录命中直接置顶",
+            "bad": "SELECT * FROM items\nWHERE cvss_score >= 9.0\nORDER BY published_at DESC;\n-- A high score is not exploitation and buries the few that matter",
+            "good": "SELECT * FROM items\nORDER BY\n  in_kev DESC,                     -- fact first\n  COALESCE(published_at, collected_at) DESC\nLIMIT 100;",
+            "note": "把\"已确认被利用\"作为第一排序键，是对有限注意力最有效的分配方式",
+            "title_en": "Fact-first query that pins catalog hits to the top",
+            "note_en": "Making confirmed exploitation the first sort key is the most effective use of finite attention"
+          }
+        ]
+      },
+      {
+        "h": "容易踩的坑",
+        "h_en": "Common pitfalls",
+        "p": "一、把未命中理解成\"安全\"：名录只收录有公开证据的案例，未被收录不代表没被利用，只是没被观察到。二、忽略处置期限字段：很多名录带截止日期，那是合规动作的硬指标，比评分更有约束力。三、只拉一次不更新：名录每日更新，新加入的条目才是最有价值的部分，应当按增量处理并高亮\"今日新增\"。",
+        "p_en": "Three pitfalls: reading absence as safety, when the catalog only records publicly evidenced cases; ignoring the remediation deadline field, which is a harder compliance driver than any score; and fetching once without updates, when the catalog changes daily and the newly added entries are the most valuable, so handle deltas and highlight today additions.",
+        "code": []
+      },
+      {
+        "h": "怎么讲给非技术同事听",
+        "h_en": "Explaining it to non-technical colleagues",
+        "p": "一句话版本：这是\"已经被真实攻击用过的漏洞清单\"，不在清单上不代表没问题，但在清单上的一定要先修。这个说法比解释 CVSS 权重容易理解得多，也更适合用来争取修复窗口。沟通时给出数字最有效，例如\"本月新增 12 条，其中 3 条影响我们在用的组件\"。",
+        "p_en": "One sentence: this is the list of vulnerabilities already used in real attacks; absence does not mean safe, but presence means fix first. It is far easier to grasp than CVSS weighting and better for winning remediation windows. Numbers convince: twelve additions this month, three affecting components we run.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CISA KEV Catalog",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "name": "CISA KEV JSON feed",
+        "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+      },
+      {
+        "name": "CWE-1395: Dependency on Vulnerable Third-Party Component",
+        "url": "https://cwe.mitre.org/data/definitions/1395.html"
+      }
+    ],
+    "tags": [
+      "KEV",
+      "威胁情报",
+      "优先级",
+      "合规"
+    ],
+    "quiz": [
+      {
+        "q": "某漏洞未出现在已知被利用名录中，能否推断它没被利用？",
+        "options": [
+          "能，名录是完整的",
+          "不能，名录只收录有公开证据的案例",
+          "能，只要评分低",
+          "取决于操作系统"
+        ],
+        "answer": 1,
+        "explain": "未被观察到与未被利用是两件事，名录的能力边界必须说清楚。",
+        "q_en": "If a vulnerability is absent from a known-exploited catalog, can you conclude it has not been exploited?",
+        "options_en": [
+          "Yes, the catalog is complete",
+          "No, it only records cases with public evidence",
+          "Yes, if the score is low",
+          "Depends on the OS"
+        ],
+        "explain_en": "Not observed and not exploited are different claims; the catalog capability boundary must be stated."
+      },
+      {
+        "q": "为什么接入一个已知被利用名录，收益可能超过接入多个漏洞库？",
+        "options": [
+          "因为文件更小",
+          "因为利用分布极度不均，名录直接指向承担绝大多数攻击的少数漏洞",
+          "因为名录更新更快",
+          "因为它是免费的"
+        ],
+        "answer": 1,
+        "explain": "注意力有限，先解决已被利用的那一小撮，收益最高。",
+        "q_en": "Why can one known-exploited feed beat several raw vulnerability databases?",
+        "options_en": [
+          "Smaller files",
+          "Exploitation is extremely skewed, so the catalog points at the minority carrying most attacks",
+          "Faster updates",
+          "It is free"
+        ],
+        "explain_en": "Attention is finite; clearing the small exploited subset first yields the highest return."
+      },
+      {
+        "q": "名录类数据最应该被高亮的部分是什么？",
+        "options": [
+          "历史全量条目",
+          "本次新增的条目",
+          "评分最高的条目",
+          "字母序第一条"
+        ],
+        "answer": 1,
+        "explain": "增量才是每天真正需要动作的部分，全量列表只会造成疲劳。",
+        "q_en": "Which part of a catalog feed deserves highlighting most?",
+        "options_en": [
+          "The full historical set",
+          "Entries newly added this round",
+          "The highest-scored entries",
+          "The first entry alphabetically"
+        ],
+        "explain_en": "The delta is what needs action today; a full list only produces fatigue."
+      }
+    ]
+  },
+  {
+    "id": "intel-osv-ghsa",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "开源漏洞数据源的差异",
+    "title_en": "Differences Between Open Source Vulnerability Feeds",
+    "level": "intermediate",
+    "icon": "OSV",
+    "color": "source",
+    "summary": "同样是漏洞数据，不同源的覆盖范围、编号体系、以及受影响版本表达方式都不一样。混用一个源会导致漏判，混用多个源会导致重复。",
+    "summary_en": "Vulnerability feeds differ in coverage, identifier scheme, and how affected versions are expressed. Relying on one causes misses; mixing many causes duplicates.",
+    "sections": [
+      {
+        "h": "四种源的定位差异",
+        "h_en": "How four feed types differ",
+        "p": "国家级漏洞库覆盖广但录入慢，适合做基线；厂商安全公告最权威最及时，但只覆盖自家产品；开源生态数据库按包管理器组织，能直接对应到具体版本区间，最适合依赖扫描；已知被利用名录只记录已被利用的事实，数量最少但优先级最高。四者不是替代关系，是分层关系。",
+        "p_en": "National databases cover broadly but lag, making them a baseline; vendor advisories are authoritative and timely but only cover their own products; ecosystem databases organized by package manager map directly to version ranges and suit dependency scanning; known-exploited catalogs record only observed exploitation, fewest entries but highest priority. These layers complement rather than replace each other.",
+        "code": []
+      },
+      {
+        "h": "受影响版本为什么不能只靠文字描述",
+        "h_en": "Why affected versions cannot rely on prose",
+        "p": "自然语言写的\"2.0 至 2.4.1 受影响\"在不同源里格式各异，无法机器比较。较新的生态数据库会给出结构化的版本区间，以及明确引入与修复的提交引用。没有结构化区间时，判断\"我这个版本是否受影响\"就退回人工阅读，规模一大必然出错。采集时应当优先保留结构化字段。",
+        "p_en": "Prose like \"2.0 through 2.4.1 affected\" varies per source and cannot be compared by machine. Newer ecosystem databases give structured ranges plus explicit introducing and fixing commit references. Without structured ranges, deciding whether your version is affected falls back to human reading, which fails at scale. Prefer preserving structured fields.",
+        "code": [
+          {
+            "lang": "json",
+            "title": "结构化区间比文字描述可靠",
+            "bad": "{\n  \"affected\": \"versions 2.0 to 2.4.1 before the patch\"\n}",
+            "good": "{\n  \"affected\": [{\n    \"package\": { \"ecosystem\": \"npm\", \"name\": \"some-lib\" },\n    \"ranges\": [{\n      \"type\": \"SEMVER\",\n      \"events\": [\n        { \"introduced\": \"2.0.0\" },\n        { \"fixed\": \"2.4.2\" }\n      ]\n    }]\n  }]\n}",
+            "note": "有 introduced 与 fixed 事件才能自动判定，文字描述永远需要人来读",
+            "title_en": "Structured ranges beat prose descriptions",
+            "note_en": "Only introduced and fixed events allow automatic judgment; prose always needs a human"
+          }
+        ]
+      },
+      {
+        "h": "多源合并的正确做法",
+        "h_en": "Merging multiple sources correctly",
+        "p": "合并的键不是漏洞编号，而是受影响包加版本区间。因为同一个问题在不同源可能有不同编号，直接按编号去重会留下重复项；反之同一编号在不同源可能描述不同组件。合并顺序上应当按可信度取字段值：受影响版本用生态库的、评分用厂商或国家库的、是否被利用用名录的。保留各源原始记录作为溯源。",
+        "p_en": "The merge key is not the identifier but the affected package plus version range: the same issue may carry different identifiers across feeds, so deduplicating by ID leaves duplicates, while one identifier may describe different components. Take each field from the most trustworthy source and keep the original records for provenance.",
+        "code": []
+      },
+      {
+        "h": "采集侧的工程约束",
+        "h_en": "Engineering constraints on the collection side",
+        "p": "不同源的限速要求差异很大，国家级库通常允许较慢的批量拉取，生态库对高频请求更敏感。工程上必须做三件事：按域名独立限速而不是全局共享、失败重试要有上限并采用指数退避、以及记录每次采集的开始时间、耗时、成功条目数与失败原因。没有这些日志，出问题时无法判断是源变了还是自己写错了。",
+        "p_en": "Rate limits differ widely: national databases tolerate slower bulk pulls while ecosystem APIs are more sensitive to bursts. Three engineering requirements: per-domain rate limiting rather than one global bucket, bounded retries with exponential backoff, and logging start time, duration, item counts and failure reasons per run. Without those logs you cannot tell a source change from your own bug.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "OSV Schema",
+        "url": "https://ossf.github.io/osv-schema/"
+      },
+      {
+        "name": "GitHub Security Advisories",
+        "url": "https://docs.github.com/en/code-security/security-advisories"
+      },
+      {
+        "name": "NVD CVE API",
+        "url": "https://nvd.nist.gov/developers/vulnerabilities"
+      }
+    ],
+    "tags": [
+      "漏洞库",
+      "数据源",
+      "OSV",
+      "GHSA"
+    ],
+    "quiz": [
+      {
+        "q": "合并多个漏洞源时，最合适的去重键是什么？",
+        "options": [
+          "漏洞编号",
+          "受影响包加版本区间",
+          "公告标题",
+          "发布时间"
+        ],
+        "answer": 1,
+        "explain": "同一问题可能有多套编号，同一编号也可能描述不同组件，按编号去重并不可靠。",
+        "q_en": "What is the best deduplication key when merging vulnerability feeds?",
+        "options_en": [
+          "The vulnerability identifier",
+          "The affected package plus version range",
+          "The advisory title",
+          "The publish date"
+        ],
+        "explain_en": "One issue may carry several identifiers, and one identifier may describe different components; ID-based dedup is unreliable."
+      },
+      {
+        "q": "为什么结构化版本区间比自然语言描述更重要？",
+        "options": [
+          "因为更短",
+          "因为只有结构化区间才能自动判定某个具体版本是否受影响",
+          "因为能减少存储",
+          "因为法规要求"
+        ],
+        "answer": 1,
+        "explain": "文字描述必须人来读，规模一大必然出错。",
+        "q_en": "Why do structured version ranges matter more than prose descriptions?",
+        "options_en": [
+          "They are shorter",
+          "Only structured ranges allow automatic judgment of whether a specific version is affected",
+          "They save storage",
+          "Regulation requires it"
+        ],
+        "explain_en": "Prose must be read by a human, which fails at scale."
+      },
+      {
+        "q": "采集多个源时，限速应该如何设计？",
+        "options": [
+          "全局一个统一间隔",
+          "按域名独立限速，并配合有上限的重试与指数退避",
+          "不限速以免超时",
+          "只在夜间采集"
+        ],
+        "answer": 1,
+        "explain": "不同源的容忍度不同，全局共用间隔要么冒犯严格源，要么拖慢宽松源。",
+        "q_en": "How should rate limiting be designed across multiple sources?",
+        "options_en": [
+          "One global interval",
+          "Per-domain limits with bounded retries and exponential backoff",
+          "No limits to avoid timeouts",
+          "Collect only at night"
+        ],
+        "explain_en": "Sources tolerate different rates; a shared interval either offends strict sources or slows lenient ones."
+      }
+    ]
+  },
+  {
+    "id": "intel-vex",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "VEX 可利用性声明",
+    "title_en": "VEX Exploitability Statements",
+    "level": "advanced",
+    "icon": "VEX",
+    "color": "process",
+    "summary": "SBOM 告诉你\"我用了什么\"，VEX 告诉你有漏洞的组件到底在不在受影响路径上。它解决的正是静态清单导致的大量误报。",
+    "summary_en": "An SBOM says what you use; VEX says whether a vulnerable component is actually on an affected path. It addresses the false positives static inventories create.",
+    "sections": [
+      {
+        "h": "四个状态值",
+        "h_en": "The four status values",
+        "p": "VEX 对每个漏洞-产品组合给出四种状态之一：受影响、不受影响、已修复、以及待评估。关键在于\"不受影响\"可以有理由，例如组件存在但相关功能未启用、或代码路径不可达。这让使用者可以批量关闭误报，而不是逐个手工验证。状态值必须机器可读，否则就退化成又一份文档。",
+        "p_en": "VEX assigns one of four states per vulnerability-product pair: affected, not affected, fixed, and under investigation. Crucially, not affected can carry a justification, such as the component present but the feature disabled, or the code path unreachable. That lets consumers close false positives in bulk instead of manually. The state must be machine-readable or it degrades into another document.",
+        "code": [
+          {
+            "lang": "json",
+            "title": "一条 VEX 声明的关键字段",
+            "bad": "{\n  \"note\": \"we checked, it is fine\"\n}",
+            "good": "{\n  \"vulnerability\": { \"name\": \"CVE-2024-0001\" },\n  \"products\": [{ \"name\": \"app\", \"version\": \"1.4.2\" }],\n  \"status\": \"not_affected\",\n  \"justification\": \"vulnerable_code_not_in_execute_path\"\n}",
+            "note": "justification 必须是枚举值，自由文本无法被工具自动消费",
+            "title_en": "Key fields of a VEX statement",
+            "note_en": "The justification must be an enum; free text cannot be consumed by tools"
+          }
+        ]
+      },
+      {
+        "h": "为什么它对减噪至关重要",
+        "h_en": "Why it is essential for noise reduction",
+        "p": "一个典型应用依赖树里有几百个包，扫描器会报出几十到上百条漏洞，其中真正可利用的往往是个位数。没有 VEX，团队只能逐条人工判断，结果通常是全部忽略或全部必修，两种都错。有 VEX 后，供应方声明与资产所有者声明可以批量降噪，把注意力集中到真正受影响的少数项。",
+        "p_en": "A typical dependency tree has hundreds of packages and scanners report dozens to hundreds of findings, of which single digits are truly exploitable. Without VEX, teams manually triage each, usually ending in either ignoring everything or fixing everything, both wrong. With VEX, supplier and asset-owner statements cut noise in bulk.",
+        "code": []
+      },
+      {
+        "h": "信任边界在哪里",
+        "h_en": "Where the trust boundary sits",
+        "p": "VEX 声明本身需要被校验：谁签的、什么时候签的、依据是什么。一份没有签名的 VEX 和一句口头保证等价。因此实践中要区分两类来源：上游供应商的声明需要验签并绑定到具体产品版本；你自己对内部资产的声明则可以内部签发，但必须记录评估人与时间，否则半年后没人敢依赖它。",
+        "p_en": "A VEX statement must itself be verified: who signed it, when, and on what basis. An unsigned VEX equals a verbal promise. Distinguish two sources: upstream supplier statements need signatures bound to specific product versions, while your own statements about internal assets can be signed internally but must record the assessor and date, or nobody will trust them six months later.",
+        "code": []
+      },
+      {
+        "h": "务实落地顺序",
+        "h_en": "A pragmatic rollout order",
+        "p": "不要一开始就追求全量覆盖。第一步，先对你已经在用的组件里漏洞最多的那三五个，手工写 VEX 声明并接入流水线，验证减噪效果。第二步，把声明纳入版本控制，随资产版本一起演进。第三步，才去推动上游供应商提供声明。顺序反了会陷入等供应商的僵局，而你能立刻控制的是自己那部分。",
+        "p_en": "Do not chase full coverage first. Start with the three to five noisiest components you already run: write VEX statements by hand, wire them into the pipeline, and confirm the noise reduction. Then version-control the statements alongside asset versions. Only then lobby upstream suppliers. Reversing the order leads to waiting on vendors, while your own portion is what you control now.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CycloneDX VEX",
+        "url": "https://cyclonedx.org/capabilities/vex/"
+      },
+      {
+        "name": "CISA VEX documentation",
+        "url": "https://www.cisa.gov/resources-tools/resources/vex"
+      },
+      {
+        "name": "OSV Schema",
+        "url": "https://ossf.github.io/osv-schema/"
+      }
+    ],
+    "tags": [
+      "VEX",
+      "SBOM",
+      "误报治理",
+      "供应链"
+    ],
+    "quiz": [
+      {
+        "q": "VEX 主要解决什么问题？",
+        "options": [
+          "加快编译",
+          "静态组件清单导致的大量误报，明确组件是否真的受影响",
+          "替代 SBOM",
+          "缩小安装包"
+        ],
+        "answer": 1,
+        "explain": "SBOM 说用了什么，VEX 说在不在受影响路径上，两者配合才能减噪。",
+        "q_en": "What problem does VEX primarily solve?",
+        "options_en": [
+          "Faster builds",
+          "Mass false positives from static inventories, by stating whether a component is truly affected",
+          "It replaces an SBOM",
+          "Smaller installers"
+        ],
+        "explain_en": "An SBOM says what is used; VEX says whether it is on an affected path. Both are needed to cut noise."
+      },
+      {
+        "q": "为什么 VEX 的状态必须机器可读？",
+        "options": [
+          "为了美观",
+          "否则无法被工具批量消费，等于又一份需要人读的文档",
+          "因为法规要求",
+          "为了减小体积"
+        ],
+        "answer": 1,
+        "explain": "减噪的价值来自自动化批量处理，人读的声明无法规模化。",
+        "q_en": "Why must VEX status be machine-readable?",
+        "options_en": [
+          "For appearance",
+          "Otherwise tools cannot consume it in bulk, leaving another human-read document",
+          "Regulation requires it",
+          "To reduce size"
+        ],
+        "explain_en": "Noise reduction comes from automated bulk handling; human-read statements do not scale."
+      },
+      {
+        "q": "一份没有签名的 VEX 声明可信度如何？",
+        "options": [
+          "完全可信",
+          "等同于口头保证，需要签名并绑定到具体产品版本",
+          "比签名版更可信",
+          "只对开源软件有效"
+        ],
+        "answer": 1,
+        "explain": "声明的价值取决于能否验证来源与范围，签名是基本前提。",
+        "q_en": "How trustworthy is an unsigned VEX statement?",
+        "options_en": [
+          "Fully trustworthy",
+          "Equivalent to a verbal promise; it needs a signature bound to a specific product version",
+          "More trustworthy than signed",
+          "Only valid for open source"
+        ],
+        "explain_en": "The value depends on verifying source and scope; a signature is the baseline."
+      }
+    ]
+  },
+  {
+    "id": "intel-attck-map",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "ATT&CK 战术与技术映射",
+    "title_en": "Mapping to ATT&CK Tactics and Techniques",
+    "level": "intermediate",
+    "icon": "ATT",
+    "color": "ir",
+    "summary": "ATT&CK 不是一份攻击工具清单，它把攻击者的行为按\"目的\"分层编号，让不同来源的情报能落在同一张坐标系上。",
+    "summary_en": "ATT&CK is not a list of hacking tools; it numbers adversary behavior by goal so intelligence from different sources lands on one coordinate system.",
+    "sections": [
+      {
+        "h": "战术与技术的关系",
+        "h_en": "How tactics and techniques relate",
+        "p": "战术是\"为什么做\"，比如初始访问、持久化、权限提升、凭据访问、横向移动、数据外传，一共十余个横向阶段。技术是\"怎么做\"，编号形如 Txxxx，挂在其所属战术下。同一个技术可能服务多个战术，例如命令解释器既能用于执行也能用于发现。这种分层让\"我担心的事\"与\"看到的事\"可以互相映射。",
+        "p_en": "A tactic is why (initial access, persistence, privilege escalation, credential access, lateral movement, exfiltration — a dozen stages). A technique is how, numbered Txxxx and attached to a tactic. One technique may serve several tactics, such as script interpreters used for both execution and discovery. This layering lets concerns and observations map to each other.",
+        "code": []
+      },
+      {
+        "h": "怎么用才有价值",
+        "h_en": "How to use it so it pays off",
+        "p": "三种常见用法：把检测规则按技术编号归类，从而一眼看出覆盖了哪些技术、漏了哪些；把威胁情报里的行为描述翻译成技术编号，从而把零散报告变成可统计的数据；以及在做威胁建模时按战术逐项问\"如果攻击者要在这个阶段动手，我们有什么能看见\"。第三种做法最能暴露检测盲区。",
+        "p_en": "Three uses: group detection rules by technique ID so coverage gaps become visible; translate prose from threat reports into technique IDs so scattered reports become countable data; and in threat modeling walk tactics one by one asking what we could see if an adversary acted at this stage. The third exposes detection blind spots best.",
+        "code": [
+          {
+            "lang": "yaml",
+            "title": "检测规则按技术编号归档",
+            "bad": "title: suspicious powershell\n# No IDs, so coverage cannot be measured or aligned with intelligence",
+            "good": "title: Encoded PowerShell command line\ndetection:\n  selection:\n    Image|endswith: \\powershell.exe\n    CommandLine|contains: -enc\ntags:\n  - attack.execution\n  - attack.t1059.001        # IDs are the key to measurement and alignment\nlevel: high",
+            "note": "有了编号才能回答\"我们覆盖了哪些技术、哪些完全空白\"",
+            "title_en": "Tag detection rules with technique IDs",
+            "note_en": "Only with IDs can you answer which techniques you cover and which are blank"
+          }
+        ]
+      },
+      {
+        "h": "覆盖率的正确理解",
+        "h_en": "Understanding coverage correctly",
+        "p": "技术覆盖率不等于防护有效性。覆盖了某个技术，可能只覆盖了它的一种实现；没覆盖也未必是漏洞，因为该技术可能根本不适用于你的环境。因此覆盖率应当作为\"排查清单\"使用，而不是作为对外汇报的分数。真正有价值的问题是：对我们环境适用的那些技术里，哪些完全看不见。",
+        "p_en": "Technique coverage is not protection effectiveness. Covering a technique may cover only one implementation, and a gap may be irrelevant if the technique does not apply to your environment. Treat coverage as an audit checklist, not a reported score. The valuable question: among techniques that apply here, which are entirely invisible.",
+        "code": []
+      },
+      {
+        "h": "避免的两种极端",
+        "h_en": "Two extremes to avoid",
+        "p": "一种是把每个发现都硬套一个技术编号，导致编号失真、统计失去意义。另一种是只收藏矩阵图不做映射，把 ATT&CK 当成装饰。务实的中间路线是：只对真正能落到具体检测或具体事件的条目做映射，数量少但每条都能追溯到一个规则或一次分析结论。宁可覆盖率数字难看，也不要注水。",
+        "p_en": "One extreme force-fits a technique ID onto every finding, corrupting the numbers. The other collects matrix posters without mapping, treating ATT&CK as decoration. The pragmatic middle: map only entries that land on a concrete detection or a concrete incident, few but each traceable to a rule or an analytical conclusion. Better an ugly coverage number than an inflated one.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE ATT&CK",
+        "url": "https://attack.mitre.org/"
+      },
+      {
+        "name": "ATT&CK Enterprise Matrix",
+        "url": "https://attack.mitre.org/matrices/enterprise/"
+      },
+      {
+        "name": "MITRE D3FEND",
+        "url": "https://d3fend.mitre.org/"
+      }
+    ],
+    "tags": [
+      "ATT&CK",
+      "威胁情报",
+      "检测工程",
+      "映射"
+    ],
+    "quiz": [
+      {
+        "q": "ATT&CK 中战术与技术的区别是什么？",
+        "options": [
+          "战术是编号，技术是名称",
+          "战术描述目的（为什么做），技术描述手段（怎么做）",
+          "两者完全等价",
+          "战术只用于云环境"
+        ],
+        "answer": 1,
+        "explain": "按目的分层的设计让不同来源的情报可以落在同一坐标系上。",
+        "q_en": "What distinguishes a tactic from a technique in ATT&CK?",
+        "options_en": [
+          "Tactics are numbers, techniques are names",
+          "A tactic is the goal (why), a technique is the means (how)",
+          "They are equivalent",
+          "Tactics apply only to cloud"
+        ],
+        "explain_en": "Layering by goal lets intelligence from different sources share one coordinate system."
+      },
+      {
+        "q": "技术覆盖率数字最应该被当作什么使用？",
+        "options": [
+          "对外汇报的成绩",
+          "内部排查清单，用来发现完全看不见的适用技术",
+          "采购依据",
+          "人员考核指标"
+        ],
+        "answer": 1,
+        "explain": "覆盖率不等于有效性，把它当成绩容易注水，当清单才有价值。",
+        "q_en": "What should a technique coverage number be used as?",
+        "options_en": [
+          "A score to report externally",
+          "An internal audit checklist for finding applicable techniques with no visibility",
+          "A procurement basis",
+          "A performance metric"
+        ],
+        "explain_en": "Coverage is not effectiveness; as a score it gets inflated, as a checklist it has value."
+      },
+      {
+        "q": "给检测规则加 ATT&CK 编号的直接收益是什么？",
+        "options": [
+          "规则运行更快",
+          "能统计覆盖了哪些技术、并让规则与外部情报对齐",
+          "减少日志量",
+          "自动修复漏洞"
+        ],
+        "answer": 1,
+        "explain": "编号是统计与对齐的键，没有它规则就只是一堆孤立文件。",
+        "q_en": "What is the direct benefit of tagging detection rules with ATT&CK IDs?",
+        "options_en": [
+          "Faster rule execution",
+          "You can measure technique coverage and align rules with external intelligence",
+          "Less log volume",
+          "Automatic patching"
+        ],
+        "explain_en": "The ID is the key for measurement and alignment; without it rules are isolated files."
+      }
+    ]
+  },
+  {
+    "id": "intel-source-quality",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "情报源可信度评估",
+    "title_en": "Assessing Intelligence Source Reliability",
+    "level": "intermediate",
+    "icon": "SRC",
+    "color": "method",
+    "summary": "情报工作的第一课不是分析，而是判断\"这条信息谁说的、他凭什么知道\"。来源没有标注可信度的情报，价值接近零。",
+    "summary_en": "The first lesson of intelligence is not analysis but judging who said it and how they would know. Intelligence without a reliability marker is close to worthless.",
+    "sections": [
+      {
+        "h": "两个维度：可靠性 × 准确性",
+        "h_en": "Two dimensions: reliability and accuracy",
+        "p": "经典做法是两维打分。来源可靠性分六级，从\"完全可靠\"到\"无法判断\"；信息准确性也分六级，从\"其他来源已确认\"到\"无法判断\"。两者组合才有意义：可靠来源也可能传错话，不可靠来源也可能偶然说对。实践中至少要在数据里保留\"来源\"与\"是否已交叉验证\"两个字段。",
+        "p_en": "The classic approach scores two axes. Source reliability has six levels from completely reliable to cannot be judged; information accuracy has six levels from confirmed by other sources to cannot be judged. Only the combination is meaningful: reliable sources relay errors, unreliable ones are occasionally right. Keep at least source and cross-verified as fields.",
+        "code": []
+      },
+      {
+        "h": "交叉验证的最小实现",
+        "h_en": "A minimal cross-verification",
+        "p": "不需要复杂系统：当同一事实出现在两个互不依赖的来源中，标记为已交叉验证。关键在\"互不依赖\"——两家媒体转载同一篇通稿不算两条来源。工程上的做法是记录每个事实的首次出现来源与确认来源列表，而不是只存最终结论。",
+        "p_en": "No complex system is needed: when the same fact appears in two mutually independent sources, mark it cross-verified. The key word is independent: two outlets reprinting one press release is one source. Record first-seen source plus the confirmation list per fact, not just the final conclusion.",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "保留来源链而不是只留结论",
+            "bad": "UPDATE items SET verified = 1 WHERE id = ?;\n-- Storing only verified cannot answer who verified it or on what basis",
+            "good": "CREATE TABLE item_sources (\n  item_id    INTEGER NOT NULL,\n  source     TEXT    NOT NULL,   -- a concrete source identifier\n  first_seen TEXT    NOT NULL,   -- first seen\n  url        TEXT    NOT NULL,   -- original URL, mandatory\n  PRIMARY KEY (item_id, source)\n);",
+            "note": "来源链让你在结论被推翻时能追溯到底是谁先说的",
+            "title_en": "Keep the source chain, not just the conclusion",
+            "note_en": "The source chain lets you trace who said it first when a conclusion is overturned"
+          }
+        ]
+      },
+      {
+        "h": "时间衰减",
+        "h_en": "Temporal decay",
+        "p": "情报的价值随时间下降，且不同种类的衰减速度差别很大：一个 IP 地址的归属可能几个月就变了，某个漏洞的利用状态可能几天就变，而一个组织架构的描述可能几年都有效。因此\"最后更新时间\"必须成为必填字段，展示时也应该让人一眼看到\"这条信息有多旧\"，而不是只显示采集时间。",
+        "p_en": "Value decays with time at very different rates: an IP ownership may shift within months, an exploitation status within days, an org structure may hold for years. Thus last-updated must be a required field, and the display should make staleness obvious rather than showing only collection time.",
+        "code": []
+      },
+      {
+        "h": "不要自己骗自己",
+        "h_en": "Do not fool yourself",
+        "p": "两个常见自欺：把\"我搜到了\"当成\"这是真的\"，以及把\"很多地方都在说\"当成\"已被证实\"。前者混淆了可得性与真实性，后者混淆了传播广度与独立来源数。诚实的做法是在数据模型里把\"未验证\"作为默认状态，任何升级为\"已验证\"都需要记录依据。默认不信任，是最省事的纪律。",
+        "p_en": "Two common self-deceptions: treating \"I found it\" as \"it is true\", and \"many places say it\" as \"confirmed\". The first confuses availability with truth; the second confuses spread with independent source count. Model unverified as the default state and require recorded evidence to upgrade it. Default distrust is the cheapest discipline.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "FIRST CTI SIG Curriculum",
+        "url": "https://www.first.org/global/sigs/cti/curriculum"
+      },
+      {
+        "name": "MITRE ATT&CK",
+        "url": "https://attack.mitre.org/"
+      },
+      {
+        "name": "NIST SP 800-150 Cyber Threat Intelligence",
+        "url": "https://csrc.nist.gov/pubs/sp/800/150/final"
+      }
+    ],
+    "tags": [
+      "情报",
+      "可信度",
+      "交叉验证",
+      "方法论"
+    ],
+    "quiz": [
+      {
+        "q": "两家媒体转载同一篇通稿，能否算作两个独立来源？",
+        "options": [
+          "能，因为是两家",
+          "不能，独立性要求来源之间互不依赖",
+          "取决于转载时间",
+          "取决于语言"
+        ],
+        "answer": 1,
+        "explain": "独立来源的关键在信息链条不同，而不是发布者数量不同。",
+        "q_en": "Do two outlets reprinting one press release count as two independent sources?",
+        "options_en": [
+          "Yes, they are two outlets",
+          "No, independence requires the sources not depend on each other",
+          "Depends on timing",
+          "Depends on language"
+        ],
+        "explain_en": "Independence is about distinct information chains, not the number of publishers."
+      },
+      {
+        "q": "为什么\"最后更新时间\"必须成为必填字段？",
+        "options": [
+          "为了排序美观",
+          "因为不同情报的时效衰减速度差异很大，读者需要判断是否已过期",
+          "为了减少存储",
+          "因为法规要求"
+        ],
+        "answer": 1,
+        "explain": "只显示采集时间会让人误以为信息是新的，实际内容可能早已失效。",
+        "q_en": "Why must last-updated be a required field?",
+        "options_en": [
+          "For tidy sorting",
+          "Because decay rates differ widely and readers must judge staleness",
+          "To save storage",
+          "Regulation requires it"
+        ],
+        "explain_en": "Showing only collection time implies freshness while the content may already be stale."
+      },
+      {
+        "q": "在数据模型里，\"已验证\"状态应该如何产生？",
+        "options": [
+          "默认就是已验证",
+          "默认未验证，升级时必须记录依据与来源",
+          "由条目数量决定",
+          "由发布时间决定"
+        ],
+        "answer": 1,
+        "explain": "默认不信任是最省事的纪律，升级需留下可追溯依据。",
+        "q_en": "How should a verified state be produced in the data model?",
+        "options_en": [
+          "Verified by default",
+          "Unverified by default, upgraded only with recorded evidence and sources",
+          "Determined by item count",
+          "Determined by publish date"
+        ],
+        "explain_en": "Default distrust is the cheapest discipline; upgrades need traceable evidence."
+      }
+    ]
+  },
+  {
+    "id": "intel-cve-lifecycle",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "漏洞编号与生命周期",
+    "title_en": "Vulnerability Identifiers and Lifecycle",
+    "level": "beginner",
+    "icon": "CVE",
+    "color": "source",
+    "summary": "一个漏洞从被发现到被收录，中间要经过申请、分配、发布、 enriching 几个阶段，每个阶段数据完整度都不一样。同期数据混用会得出错误结论。",
+    "summary_en": "A vulnerability passes through request, assignment, publication and enrichment, each with different data completeness. Mixing stages produces wrong conclusions.",
+    "sections": [
+      {
+        "h": "为什么刚发布的条目字段是空的",
+        "h_en": "Why fresh entries have empty fields",
+        "p": "漏洞编号先被保留、再被公开，此时往往只有一段描述，评分与受影响产品要等后续分析补齐。这解释了为什么很多系统里新条目的评分字段缺失率极高。这不是采集程序的 bug，而是数据本身的阶段性特征。正确做法是把\"未评分\"作为一种正常状态建模，而不是当作 0 分。",
+        "p_en": "An identifier is reserved and published before enrichment, so initially there is often only a description; scores and affected products arrive later. This explains the high missing-rate of scores among recent entries. It is a stage characteristic of the data, not a collector bug. Model unscored as a legitimate state, never as zero.",
+        "code": []
+      },
+      {
+        "h": "保留编号的几种变体",
+        "h_en": "Identifier variants you will meet",
+        "p": "同一问题可能同时存在漏洞库编号、厂商自己的编号、以及生态库的编号。厂商编号有时更早发布、信息更全，但只在自家公告里。采集时应把多个编号都存下来并建立等价关系，而不是只挑一个。否则用另一个编号去查时会出现\"查不到\"，你会误判为数据缺失。",
+        "p_en": "One issue may carry a national database ID, a vendor ID, and an ecosystem ID. Vendor IDs are sometimes earlier and richer but live only in their own advisories. Store all identifiers and record equivalence; keeping just one produces lookups that fail and look like missing data.",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "一号多源：分别存主键与别名",
+            "bad": "CREATE TABLE items (\n  cve TEXT PRIMARY KEY   -- other identifiers have nowhere to live\n);",
+            "good": "CREATE TABLE items (\n  cve TEXT PRIMARY KEY,\n  vendor_id TEXT           -- e.g. a vendor advisory id\n);\n\nCREATE TABLE item_aliases (\n  cve   TEXT NOT NULL,\n  alias TEXT NOT NULL,\n  kind  TEXT NOT NULL,     -- ghsa / osv / vendor / cwe\n  PRIMARY KEY (cve, alias)\n);",
+            "note": "别名表让任何一套编号都能反查到同一条记录",
+            "title_en": "One record, many identifiers: primary key plus alias table",
+            "note_en": "The alias table lets any identifier resolve to the same record"
+          }
+        ]
+      },
+      {
+        "h": "生命周期对展示的影响",
+        "h_en": "How the lifecycle affects display",
+        "p": "由于字段完整度差异巨大，界面不应把\"无评分\"渲染成一条缺失的空白，也不应在排序时把它当作最低优先级沉到底部。合理做法是分区展示：已评分按分值排序，未评分单独一组并标注\"待补全\"。这样读者能立即理解数据状态，而不是怀疑程序出错。",
+        "p_en": "Given the huge completeness gap, the UI should not render no-score as a blank gap, nor sink it to the bottom as lowest priority. Present it in partitions: scored items sorted by score, unscored grouped separately and labeled pending enrichment. Readers then understand the data state instead of suspecting a bug.",
+        "code": []
+      },
+      {
+        "h": "采集策略上的取舍",
+        "h_en": "Trade-offs in collection strategy",
+        "p": "如果只拉最近更新的条目，会拿到大量尚未补齐的条目，看起来很新但信息很少；如果只拉已补齐的条目，会漏掉最新的紧急漏洞。务实做法是两者都拉，并在记录里保存\"采集时该条目的完整度\"，让后续分析能区分\"当时没补全\"和\"现在也没有\"。",
+        "p_en": "Pulling only recently updated entries yields many unenriched items that look fresh but say little; pulling only enriched ones misses the newest urgent flaws. Do both and record completeness at collection time so later analysis can distinguish was not enriched then from is not enriched now.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CVE Program",
+        "url": "https://www.cve.org/"
+      },
+      {
+        "name": "NVD CVE API",
+        "url": "https://nvd.nist.gov/developers/vulnerabilities"
+      },
+      {
+        "name": "OSV Schema",
+        "url": "https://ossf.github.io/osv-schema/"
+      }
+    ],
+    "tags": [
+      "CVE",
+      "数据建模",
+      "生命周期",
+      "数据源"
+    ],
+    "quiz": [
+      {
+        "q": "新发布的漏洞条目评分字段大量缺失，最可能的原因是什么？",
+        "options": [
+          "采集程序有 bug",
+          "漏洞编号先公开、评分等分析后补齐，是数据的阶段性特征",
+          "数据源故意隐藏",
+          "评分只对旧漏洞提供"
+        ],
+        "answer": 1,
+        "explain": "把未评分建模为正常状态，而不是当作 0 分或程序错误。",
+        "q_en": "Why are score fields often missing on newly published entries?",
+        "options_en": [
+          "A collector bug",
+          "Identifiers publish before enrichment, so scores arrive later — a stage characteristic",
+          "The source hides them",
+          "Scores are only for old vulnerabilities"
+        ],
+        "explain_en": "Model unscored as a legitimate state, not zero and not an error."
+      },
+      {
+        "q": "同一漏洞存在多套编号时，正确做法是？",
+        "options": [
+          "只保留一个最权威的",
+          "全部保留并建立别名等价关系",
+          "按字母序挑一个",
+          "丢弃厂商编号"
+        ],
+        "answer": 1,
+        "explain": "别名表让任何一套编号都能反查同一条，避免误判为数据缺失。",
+        "q_en": "When one vulnerability carries several identifiers, the right approach is to:",
+        "options_en": [
+          "Keep only the most authoritative one",
+          "Keep all and record alias equivalence",
+          "Pick one alphabetically",
+          "Discard vendor IDs"
+        ],
+        "explain_en": "An alias table lets any identifier resolve to the same record, avoiding false missing-data conclusions."
+      },
+      {
+        "q": "界面上如何处理\"无评分\"的条目？",
+        "options": [
+          "混在已评分里按 0 分排序",
+          "分区展示，并标注待补全",
+          "直接隐藏",
+          "自动填一个平均分"
+        ],
+        "answer": 1,
+        "explain": "分区能让人立刻理解数据状态，避免误以为程序出错。",
+        "q_en": "How should unscored items be presented in the UI?",
+        "options_en": [
+          "Mixed in and sorted as zero",
+          "Shown in a separate partition labeled pending enrichment",
+          "Hidden entirely",
+          "Auto-filled with an average score"
+        ],
+        "explain_en": "Partitioning makes the data state obvious instead of looking like a bug."
+      }
+    ]
+  },
+  {
+    "id": "intel-triage-scale",
+    "kind": "lesson",
+    "category": "漏洞情报",
+    "cwe": null,
+    "title": "把告警量压到可处理规模",
+    "title_en": "Compressing Alert Volume to a Workable Size",
+    "level": "intermediate",
+    "icon": "SCALE",
+    "color": "process",
+    "summary": "情报系统最常见的结果不是\"没发现\"，而是\"每天几百条没人看\"。压量不是降低标准，而是把有限注意力分配到真正会变的条目上。",
+    "summary_en": "The usual failure of an intelligence system is not zero findings but hundreds a day that nobody reads. Compression is about allocating finite attention to what actually changes.",
+    "sections": [
+      {
+        "h": "先去重再去噪",
+        "h_en": "Deduplicate first, then denoise",
+        "p": "顺序很重要。同一漏洞被多个源报道，不先去重就会在后续每一步被重复计算，噪声被放大数倍。去重之后再谈降噪，比如剔除不适用本环境的产品、剔除已确认不影响的组件。反过来做会浪费大量精力在对重复项做判断。",
+        "p_en": "Order matters. One vulnerability reported by several sources, if not deduplicated, is recounted at every later step, amplifying noise several-fold. Deduplicate, then denoise by removing products not applicable to this environment and components confirmed unaffected. The reverse order wastes effort judging duplicates.",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "去重与降噪的先后顺序",
+            "bad": "-- Denoise first: one vulnerability counted three times, judged three times\nSELECT * FROM items WHERE product NOT LIKE ? AND cvss_score > 7;",
+            "good": "-- Aggregate by identifier first, denoise only the aggregate\nWITH uniq AS (\n  SELECT cve, MAX(cvss_score) AS cvss_score,\n         MAX(in_kev)      AS in_kev\n  FROM items\n  GROUP BY cve\n)\nSELECT * FROM uniq\nWHERE in_kev = 1 OR cvss_score >= 7\nORDER BY in_kev DESC, cvss_score DESC;",
+            "note": "聚合之后的降噪才是对\"不同问题\"做判断，而不是对\"同一问题的多份报道\"重复劳动",
+            "title_en": "Deduplicate before denoising",
+            "note_en": "Denoise after aggregation so you judge distinct issues instead of repeated reports of one"
+          }
+        ]
+      },
+      {
+        "h": "分层而不是一刀切阈值",
+        "h_en": "Tier instead of a single threshold",
+        "p": "一个阈值要么漏要么淹。分层做法是把输出分成三层：必须今天处理（已被利用且影响在用组件）、应当本周评估（高分或高概率但需确认适用性）、以及仅记录（其余全部归档但可检索）。三层的比例通常接近 1:5:100，管理者看第一层，工程师看前两层，第三层作为背景资料。",
+        "p_en": "One threshold either misses or drowns. Tier the output: must handle today (exploited and affecting components in use), evaluate this week (high severity or probability pending applicability), and record only (everything else archived but searchable). Proportions are typically near 1:5:100; managers read tier one, engineers read two, tier three is background.",
+        "code": []
+      },
+      {
+        "h": "变化检测比全量重算更有价值",
+        "h_en": "Change detection beats full recomputation",
+        "p": "大多数条目每天的内容是一样的。真正需要人看的是变化：新出现的、状态改变的、评分被上调的、从\"未在名录\"变成\"已列入名录\"的。把每次采集与上一次做差分，只把差分结果推给人，信息量会下降一到两个数量级，而关键事件一个都不会漏。",
+        "p_en": "Most entries are identical day to day. What needs human attention is change: newly appearing, status changed, score raised, moved from not-listed to listed. Diff each run against the previous one and surface only the delta — volume drops by one to two orders of magnitude with no loss of critical events.",
+        "code": []
+      },
+      {
+        "h": "衡量压量是否成功",
+        "h_en": "Measuring whether compression worked",
+        "p": "两个指标就够：每日进入第一层的条目数，以及从条目入库到被处理的平均时长。前者反映压量是否有效，后者反映流程是否通畅。如果第一层每天几十条，说明分层条件太松；如果平均处置时长持续上升，说明队列在堆积。两个数字都比\"总条目数\"更能说明系统是否可用。",
+        "p_en": "Two metrics suffice: the daily count entering tier one, and the average time from ingestion to handling. The first shows whether compression works, the second whether the process flows. Dozens in tier one daily means the tier is too loose; rising handling time means a growing queue. Both beat total item count for judging usability.",
+        "code": []
+      }
+    ],
+    "refs": [
+      {
+        "name": "CISA KEV Catalog",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "name": "FIRST EPSS",
+        "url": "https://www.first.org/epss/"
+      },
+      {
+        "name": "NIST SP 800-61 Incident Handling",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r3/final"
+      }
+    ],
+    "tags": [
+      "降噪",
+      "优先级",
+      "流程",
+      "指标"
+    ],
+    "quiz": [
+      {
+        "q": "为什么必须先做去重再做降噪？",
+        "options": [
+          "因为去重更快",
+          "否则同一问题会被重复判断多次，噪声在每一步被放大",
+          "因为降噪会删除数据",
+          "因为去重更准确"
+        ],
+        "answer": 1,
+        "explain": "顺序颠倒会把精力浪费在重复项上，判断量成倍增加。",
+        "q_en": "Why deduplicate before denoising?",
+        "options_en": [
+          "It is faster",
+          "Otherwise the same issue is judged repeatedly and noise is amplified at every step",
+          "Denoising deletes data",
+          "Dedup is more accurate"
+        ],
+        "explain_en": "Reversed order wastes effort on duplicates and multiplies the judgment load."
+      },
+      {
+        "q": "分层输出相比单一阈值的主要优势是？",
+        "options": [
+          "实现更简单",
+          "避免一刀切造成的要么漏报要么淹没，让不同角色看不同层",
+          "不需要配置",
+          "能自动修复"
+        ],
+        "answer": 1,
+        "explain": "单一阈值必然在漏与淹之间失衡，分层让注意力按角色分配。",
+        "q_en": "What is the main advantage of tiered output over a single threshold?",
+        "options_en": [
+          "Simpler to build",
+          "It avoids the miss-or-flood tradeoff and gives each role the right layer",
+          "No configuration needed",
+          "It auto-remediates"
+        ],
+        "explain_en": "A single threshold inevitably misbalances; tiers allocate attention by role."
+      },
+      {
+        "q": "衡量告警压量效果，最该看哪两个指标？",
+        "options": [
+          "总条目数与数据库大小",
+          "每日进入最高层的条目数，以及入库到处理的平均时长",
+          "采集耗时与安装包体积",
+          "来源数量与词汇数量"
+        ],
+        "answer": 1,
+        "explain": "一个反映压量是否有效，一个反映队列是否在堆积。",
+        "q_en": "Which two metrics best measure alert compression?",
+        "options_en": [
+          "Total items and database size",
+          "Daily count entering the top tier and average ingestion-to-handling time",
+          "Collection duration and installer size",
+          "Source count and vocabulary size"
+        ],
+        "explain_en": "One shows whether compression works; the other whether the queue is backing up."
+      }
+    ]
+  }
+]

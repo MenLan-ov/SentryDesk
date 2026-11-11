@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#26302B"/>
+      <stop offset="100%" stop-color="#101413"/>
+    </linearGradient>
+    <linearGradient id="shieldLine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#A8D45F"/>
+      <stop offset="100%" stop-color="#6E9F36"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M0 112 Q0 0 112 0 H400 Q512 0 512 112 V176 Q256 222 0 176 Z"
+        fill="#FFFFFF" opacity="0.04"/>
+
+  <!-- 盾牌描边 -->
+  <path d="M256 74 L404 134 L404 280 C404 370 344 432 256 460 C168 432 108 370 108 280 L108 134 Z"
+        fill="none" stroke="url(#shieldLine)" stroke-width="26" stroke-linejoin="round"/>
+
+  <!-- 信号弧：从左下角发散的同心弧，读作「持续扫描」 -->
+  <g stroke-linecap="round" fill="none">
+    <path d="M200 300 A 74 74 0 0 0 200 226" stroke="#FFFFFF" stroke-width="0" />
+    <circle cx="186" cy="314" r="17" fill="#FFFFFF"/>
+    <path d="M186 314 A 54 54 0 0 1 240 260" stroke="#FFFFFF" stroke-width="17" opacity="0.95"/>
+    <path d="M186 314 A 104 104 0 0 1 290 210" stroke="#FFFFFF" stroke-width="17" opacity="0.6"/>
+    <path d="M186 314 A 154 154 0 0 1 340 160" stroke="#FFFFFF" stroke-width="16" opacity="0.3"/>
+  </g>
+
+  <!-- 知识刻度：底部两道绿线，暗示知识积累 -->
+  <rect x="292" y="316" width="76" height="12" rx="6" fill="#7CB342" opacity="0.95"/>
+  <rect x="292" y="344" width="48" height="12" rx="6" fill="#7CB342" opacity="0.55"/>
+</svg>

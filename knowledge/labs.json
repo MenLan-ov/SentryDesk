@@ -1,0 +1,804 @@
+[
+  {
+    "id": "lab-harden-01",
+    "kind": "lab",
+    "category": "配置加固",
+    "cwe": null,
+    "title": "Web 服务基础安全头加固",
+    "title_en": "Hardening HTTP Security Headers",
+    "level": "beginner",
+    "icon": "HDR",
+    "color": "harden",
+    "summary": "用六条响应头把浏览器侧的默认攻击面压下去，改动小、收益立竿见影。",
+    "summary_en": "Six response headers reduce the browser-side attack surface.",
+    "sections": [
+      {
+        "h": "目标",
+        "p": "让浏览器在处理本页面时启用尽可能严格的默认策略：禁止被嵌入、禁止加载未知来源脚本、禁止 MIME 嗅探、强制 HTTPS、限制敏感能力调用、隔离跨源窗口引用。",
+        "h_en": "Goal",
+        "p_en": "Make the browser apply the strictest sensible defaults when processing this page: prevent embedding, forbid loading scripts of unknown origin, disable MIME sniffing, force HTTPS, restrict sensitive capabilities, and isolate cross-origin window references."
+      },
+      {
+        "h": "具体配置",
+        "p": "Strict-Transport-Security: max-age=31536000; includeSubDomains。Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'。X-Content-Type-Options: nosniff。Referrer-Policy: strict-origin-when-cross-origin。Permissions-Policy: geolocation=(), camera=(), microphone=()。Cross-Origin-Opener-Policy: same-origin。",
+        "h_en": "Concrete configuration",
+        "p_en": "Strict-Transport-Security: max-age=31536000; includeSubDomains. Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'. X-Content-Type-Options: nosniff. Referrer-Policy: strict-origin-when-cross-origin. Permissions-Policy: geolocation=(), camera=(), microphone=(). Cross-Origin-Opener-Policy: same-origin."
+      },
+      {
+        "h": "落地顺序",
+        "p": "先在报告模式（CSP 用 Content-Security-Policy-Report-Only）观察一周，收集被拦截的资源清单，逐项修正或加入白名单，再切换到强制模式。直接上强制模式容易造成线上功能中断。",
+        "h_en": "Rollout order",
+        "p_en": "Start in report-only mode (CSP via Content-Security-Policy-Report-Only) for a week, collect blocked resource lists, fix or whitelist each item, then switch to enforcing. Going straight to enforcing often breaks production."
+      },
+      {
+        "h": "验证方法",
+        "p": "用浏览器开发者工具的网络面板确认响应头存在；在控制台查看是否有 CSP 违规报错；用在线头部分析工具做一次基线对比。",
+        "h_en": "Verification",
+        "p_en": "Confirm headers in the browser network panel; watch the console for CSP violations; run a baseline comparison with an online header analysis tool."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Secure Headers",
+        "url": "https://owasp.org/www-project-secure-headers/"
+      },
+      {
+        "name": "MDN CSP",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP"
+      }
+    ],
+    "tags": [
+      "加固",
+      "Web",
+      "配置"
+    ],
+    "quiz": [
+      {
+        "q": "CSP 上线前推荐的做法是？",
+        "options": [
+          "直接强制模式",
+          "先用 Report-Only 观察并修正",
+          "只在测试环境用",
+          "不使用 CSP"
+        ],
+        "answer": 1,
+        "explain": "直接强制容易造成线上功能中断。",
+        "q_en": "Recommended approach before enabling CSP?",
+        "options_en": [
+          "Go straight to enforcing",
+          "Use report-only first, observe, and fix",
+          "Only in test",
+          "Do not use CSP"
+        ],
+        "explain_en": "Enforcing immediately often breaks production."
+      },
+      {
+        "q": "frame-ancestors 的作用是？",
+        "options": [
+          "限制脚本来源",
+          "限制谁可以嵌入本页",
+          "限制表单提交",
+          "限制 Cookie"
+        ],
+        "answer": 1,
+        "explain": "防点击劫持。",
+        "q_en": "What does frame-ancestors do?",
+        "options_en": [
+          "Restrict script sources",
+          "Restrict who may embed this page",
+          "Restrict form posts",
+          "Restrict cookies"
+        ],
+        "explain_en": "Prevents clickjacking."
+      },
+      {
+        "q": "nosniff 防的是什么？",
+        "options": [
+          "SQL 注入",
+          "浏览器 MIME 嗅探导致的脚本执行",
+          "弱口令",
+          "越权"
+        ],
+        "answer": 1,
+        "explain": "阻止浏览器把非脚本内容当脚本执行。",
+        "q_en": "What does nosniff prevent?",
+        "options_en": [
+          "SQL injection",
+          "Browser MIME sniffing leading to script execution",
+          "Weak passwords",
+          "Privilege escalation"
+        ],
+        "explain_en": "Stops browsers treating non-script content as script."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "lab-harden-02",
+    "kind": "lab",
+    "category": "配置加固",
+    "cwe": null,
+    "title": "数据库账号最小权限落地",
+    "title_en": "Least-Privilege Database Accounts",
+    "level": "intermediate",
+    "icon": "DB",
+    "color": "harden",
+    "summary": "把「一个账号打天下」拆成按用途分离的多个账号，注入类漏洞的危害随之大幅下降。",
+    "summary_en": "Split one all-powerful DB account into purpose-scoped accounts.",
+    "sections": [
+      {
+        "h": "问题",
+        "p": "应用连接数据库的账号往往拥有全部权限。一旦存在 SQL 注入，攻击者可直接读写任意表、调用系统函数、甚至通过文件写入提权。",
+        "h_en": "Problem",
+        "p_en": "The account the application uses for the database often holds all privileges. Given SQL injection, an attacker can read and write any table, call system functions, and even escalate via file writes."
+      },
+      {
+        "h": "拆分方案",
+        "p": "按用途拆分为：只读账号（报表、查询）、读写账号（业务主路径）、迁移账号（仅 DDL，仅部署时使用）、备份账号。业务应用只持有读写账号，且仅对所需表授权。",
+        "h_en": "Split plan",
+        "p_en": "Separate accounts by purpose: read-only (reporting, queries), read-write (main business path), migration (DDL only, used during deployment), and backup. The application holds only the read-write account, granted only on required tables."
+      },
+      {
+        "h": "授权语句示例",
+        "p": "GRANT SELECT, INSERT, UPDATE ON app.orders TO 'app_rw'@'%'; 显式列出表名而非 app.*。撤销默认的 FILE、PROCESS、SUPER 权限。禁止业务账号执行 CREATE、DROP、ALTER。",
+        "h_en": "Grant example",
+        "p_en": "GRANT SELECT, INSERT, UPDATE ON app.orders TO 'app_rw'@'%'; list table names explicitly rather than app.*. Revoke FILE, PROCESS, and SUPER by default. Business accounts must not execute CREATE, DROP, or ALTER."
+      },
+      {
+        "h": "验证方法",
+        "p": "用业务账号尝试 DROP TABLE、SELECT ... INTO OUTFILE、读取 mysql.user，应全部失败。把验证语句纳入部署后的自检脚本。",
+        "h_en": "Verification",
+        "p_en": "With the business account, attempt DROP TABLE, SELECT ... INTO OUTFILE, and reading mysql.user; all must fail. Add these statements to post-deployment self-checks."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Database Security",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Database_Security_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "加固",
+      "数据库",
+      "权限"
+    ],
+    "quiz": [
+      {
+        "q": "业务账号为什么不该有 DDL 权限？",
+        "options": [
+          "影响性能",
+          "放大注入等缺陷的危害",
+          "数据库不支持",
+          "影响备份"
+        ],
+        "answer": 1,
+        "explain": "最小权限限制损害上限。",
+        "q_en": "Why should business accounts lack DDL privileges?",
+        "options_en": [
+          "Performance",
+          "It amplifies the impact of flaws like injection",
+          "Databases do not support it",
+          "Backups break"
+        ],
+        "explain_en": "Least privilege bounds the damage ceiling."
+      },
+      {
+        "q": "GRANT 时用 app.* 还是逐表授权？",
+        "options": [
+          "app.* 更省事",
+          "逐表授权更符合最小权限",
+          "两者等价",
+          "取决于数据库"
+        ],
+        "answer": 1,
+        "explain": "范围越小越好。",
+        "q_en": "When granting, app.* or per-table?",
+        "options_en": [
+          "app.* is simpler",
+          "Per-table follows least privilege",
+          "They are equivalent",
+          "Depends on database"
+        ],
+        "explain_en": "Smaller scope is better."
+      },
+      {
+        "q": "部署后如何验证权限配置正确？",
+        "options": [
+          "看文档",
+          "用业务账号尝试 DROP 与读系统表，应失败",
+          "重启数据库",
+          "看日志"
+        ],
+        "answer": 1,
+        "explain": "把验证做成自动自检。",
+        "q_en": "How to verify the permission configuration after deployment?",
+        "options_en": [
+          "Read the docs",
+          "Attempt DROP and reading system tables with the business account; both must fail",
+          "Restart the database",
+          "Check the logs"
+        ],
+        "explain_en": "Make verification an automated self-check."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "lab-code-01",
+    "kind": "lab",
+    "category": "代码审计",
+    "cwe": "CWE-89",
+    "title": "审计一次 SQL 拼接",
+    "title_en": "Auditing a SQL Concatenation",
+    "level": "beginner",
+    "icon": "AUDIT",
+    "color": "audit",
+    "summary": "从「找到拼接点」到「验证可利用」再到「改成参数化」，走完一个完整的修复闭环。",
+    "summary_en": "From locating a concatenation to verifying exploitability to fixing it.",
+    "sections": [
+      {
+        "h": "第一步 定位入口",
+        "p": "在代码库搜索字符串拼接进入查询执行的位置。Java 搜 Statement.execute 与 + 号拼接；Python 搜 cursor.execute 里带 % 或 f-string；Node 搜 query( 含模板字符串；Go 搜 db.Query 带 fmt.Sprintf。",
+        "h_en": "Step one: locate entry points",
+        "p_en": "Search the codebase for string concatenation reaching query execution. In Java, look for Statement.execute with + concatenation; in Python, cursor.execute with % or f-strings; in Node, query( with template literals; in Go, db.Query with fmt.Sprintf."
+      },
+      {
+        "h": "第二步 追溯数据源",
+        "p": "从拼接点往回追参数来源：是否直接来自 HTTP 请求参数、请求头、Cookie、上传文件内容。若经过白名单映射或类型转换，需确认转换是否严格。",
+        "h_en": "Step two: trace the data source",
+        "p_en": "Walk back from the concatenation to the parameter origin: direct HTTP parameters, headers, cookies, or uploaded file contents. If it passes through whitelist mapping or type conversion, confirm the conversion is strict."
+      },
+      {
+        "h": "第三步 验证",
+        "p": "在测试环境对该参数提交 ' 与 ' OR '1'='1，对比响应差异。注意区分「返回空」与「返回全部」，后者是明确的注入信号。",
+        "h_en": "Step three: verify",
+        "p_en": "Submit ' and ' OR '1'='1 against that parameter in a test environment and compare responses. Distinguish empty result from returning everything; the latter is a clear injection signal."
+      },
+      {
+        "h": "第四步 修复",
+        "p": "改为参数绑定。以 Java 为例，把 \"WHERE name='\" + name + \"'\" 改为 \"WHERE name = ?\" 并 setString(1, name)。动态表名改用枚举映射，不接受原始输入。",
+        "h_en": "Step four: fix",
+        "p_en": "Switch to parameter binding. In Java, change \"WHERE name='\" + name + \"'\" to \"WHERE name = ?\" with setString(1, name). Map dynamic table names through an enum rather than accepting raw input."
+      },
+      {
+        "h": "第五步 回归",
+        "p": "重放第三步的载荷，应被当作字面量。补充单元测试：传入含引号的字符串，断言查询结果为空而非报错。",
+        "h_en": "Step five: regression",
+        "p_en": "Replay step three payloads; they should be literals. Add unit tests: pass a string containing quotes and assert the query returns empty rather than erroring."
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE-89",
+        "url": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      {
+        "name": "OWASP SQL Injection Prevention",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "审计",
+      "SQL注入",
+      "实战"
+    ],
+    "quiz": [
+      {
+        "q": "审计 SQL 拼接，第一步是？",
+        "options": [
+          "直接改代码",
+          "搜索字符串拼接进入查询执行的位置",
+          "跑压测",
+          "看文档"
+        ],
+        "answer": 1,
+        "explain": "先定位入口再追溯数据源。",
+        "q_en": "First step when auditing SQL concatenation?",
+        "options_en": [
+          "Edit the code directly",
+          "Search for string concatenation reaching query execution",
+          "Run a load test",
+          "Read docs"
+        ],
+        "explain_en": "Locate entry points first, then trace data sources."
+      },
+      {
+        "q": "\"AND 1=2\" 返回空而 \"AND 1=1\" 返回数据，说明？",
+        "options": [
+          "正常行为",
+          "存在注入",
+          "数据库损坏",
+          "缓存命中"
+        ],
+        "answer": 1,
+        "explain": "布尔条件影响了结果集，是明确信号。",
+        "q_en": "'AND 1=2' returns empty while 'AND 1=1' returns data. This means?",
+        "options_en": [
+          "Normal behavior",
+          "Injection exists",
+          "Database corruption",
+          "Cache hit"
+        ],
+        "explain_en": "Boolean conditions affect the result set, a clear signal."
+      },
+      {
+        "q": "修复后应该补什么测试？",
+        "options": [
+          "性能测试",
+          "传入含引号字符串并断言结果为空而非报错",
+          "UI 测试",
+          "兼容性测试"
+        ],
+        "answer": 1,
+        "explain": "回归测试锁定修复效果。",
+        "q_en": "What test should be added after fixing?",
+        "options_en": [
+          "Performance test",
+          "Pass a string containing quotes and assert empty rather than error",
+          "UI test",
+          "Compatibility test"
+        ],
+        "explain_en": "Regression tests lock in the fix."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "lab-code-02",
+    "kind": "lab",
+    "category": "代码审计",
+    "cwe": "CWE-79",
+    "title": "审计一次 XSS",
+    "title_en": "Auditing a Reflected XSS",
+    "level": "beginner",
+    "icon": "AUDIT2",
+    "color": "audit",
+    "summary": "分清反射、存储、DOM 三种形态，逐个确定输出上下文，再选对应的编码方式。",
+    "summary_en": "Distinguish reflected, stored, and DOM XSS, then encode per output context.",
+    "sections": [
+      {
+        "h": "分类判定",
+        "p": "把载荷提交后，若只在当前响应中出现即为反射型；若提交后重新加载页面仍存在即为存储型；若服务端响应中看不到载荷，但页面 JS 把它写入了 DOM，即为 DOM 型。",
+        "h_en": "Classification",
+        "p_en": "After submitting the payload, if it appears only in the current response it is reflected; if it persists after reload it is stored; if the server response does not contain it but page JS writes it into the DOM, it is DOM-based."
+      },
+      {
+        "h": "定位输出上下文",
+        "p": "找到载荷最终落地的位置：HTML 正文、HTML 属性值、URL 参数、JS 字符串、CSS。每个上下文的转义规则不同，这是修复的关键判断点。",
+        "h_en": "Locate the output context",
+        "p_en": "Find where the payload finally lands: HTML body, HTML attribute value, URL parameter, JS string, or CSS. Each context has different escaping rules, and this is the key decision point for the fix."
+      },
+      {
+        "h": "修复",
+        "p": "HTML 正文与属性用 HTML 实体编码；URL 参数用 encodeURIComponent；JS 字符串用 JSON 序列化。前端框架默认转义，仅在必要处使用 v-html 并配合净化库（如 DOMPurify）。",
+        "h_en": "Fix",
+        "p_en": "HTML-encode for text and attributes; encodeURIComponent for URL parameters; JSON serialization for JS strings. Frontend frameworks escape by default; use v-html only where necessary with a sanitizer such as DOMPurify."
+      },
+      {
+        "h": "加固",
+        "p": "下发 CSP 限制脚本来源，作为纵深防御。Cookie 设置 HttpOnly，降低会话被窃取的风险。",
+        "h_en": "Hardening",
+        "p_en": "Send CSP to restrict script sources as defense in depth. Mark cookies HttpOnly to reduce session theft."
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE-79",
+        "url": "https://cwe.mitre.org/data/definitions/79.html"
+      },
+      {
+        "name": "OWASP XSS Prevention",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "审计",
+      "XSS",
+      "实战"
+    ],
+    "quiz": [
+      {
+        "q": "响应里看不到载荷但页面仍执行了，属于哪类？",
+        "options": [
+          "反射型",
+          "存储型",
+          "DOM 型",
+          "不属于 XSS"
+        ],
+        "answer": 2,
+        "explain": "载荷由前端 JS 写入 DOM，不经服务端回显。",
+        "q_en": "Payload absent from the response yet still executed. Which type?",
+        "options_en": [
+          "Reflected",
+          "Stored",
+          "DOM-based",
+          "Not XSS"
+        ],
+        "explain_en": "Frontend JS writes it into the DOM without a server echo."
+      },
+      {
+        "q": "修复 XSS 的关键判断点是？",
+        "options": [
+          "输入长度",
+          "输出上下文",
+          "请求方法",
+          "状态码"
+        ],
+        "answer": 1,
+        "explain": "不同上下文用不同编码。",
+        "q_en": "Key decision point when fixing XSS?",
+        "options_en": [
+          "Input length",
+          "Output context",
+          "HTTP method",
+          "Status code"
+        ],
+        "explain_en": "Different contexts need different encoding."
+      },
+      {
+        "q": "必须使用 v-html 时应该配合什么？",
+        "options": [
+          "直接使用",
+          "净化库（如 DOMPurify）",
+          "转成大写",
+          "加 try-catch"
+        ],
+        "answer": 1,
+        "explain": "净化后再渲染。",
+        "q_en": "What pairs with v-html when it must be used?",
+        "options_en": [
+          "Nothing",
+          "A sanitizer such as DOMPurify",
+          "Uppercasing",
+          "try-catch"
+        ],
+        "explain_en": "Sanitize before rendering."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "lab-check-01",
+    "kind": "lab",
+    "category": "安全自测",
+    "cwe": "CWE-862",
+    "title": "越权自测：十分钟跑一遍",
+    "title_en": "Ten-Minute Broken Access Control Check",
+    "level": "beginner",
+    "icon": "CHECK",
+    "color": "test",
+    "summary": "准备两个不同权限的账号，按四个方向测一遍，能覆盖绝大多数越权问题。",
+    "summary_en": "Two accounts and four directions cover most access control flaws.",
+    "sections": [
+      {
+        "h": "准备工作",
+        "p": "准备两个账号：A 为普通用户，B 为目标资源的所有者。用浏览器开发者工具或代理工具保存各自的认证凭证。",
+        "h_en": "Preparation",
+        "p_en": "Prepare two accounts: A is a normal user, B owns the target resource. Save each account's credentials using browser devtools or a proxy."
+      },
+      {
+        "h": "方向一 水平越权",
+        "p": "用 A 的凭证请求 B 的资源 ID。遍历相邻 ID。观察是否返回 B 的数据。这是最常见的漏洞，尤其是自增主键的场景。",
+        "h_en": "Direction one: horizontal",
+        "p_en": "Request B's resource IDs using A's credentials. Enumerate adjacent IDs. Watch whether B's data returns. This is the most common flaw, especially with auto-increment primary keys."
+      },
+      {
+        "h": "方向二 垂直越权",
+        "p": "用 A 的凭证请求管理员接口。即使前端没有入口，直接按路径请求。观察是否仅依赖前端隐藏。",
+        "h_en": "Direction two: vertical",
+        "p_en": "Request admin endpoints using A's credentials. Even without a frontend entry, request paths directly. Watch whether the check relies only on hiding UI."
+      },
+      {
+        "h": "方向三 未认证访问",
+        "p": "去掉认证头重放所有已抓到的请求。观察是否有接口直接返回数据。重点关注导出、批量、调试类接口。",
+        "h_en": "Direction three: unauthenticated",
+        "p_en": "Replay every captured request without the auth header. Look for endpoints returning data directly, especially export, batch, and debug endpoints."
+      },
+      {
+        "h": "方向四 方法篡改",
+        "p": "把 GET 改为 POST/PUT/DELETE，把只读接口改为写操作。观察是否有接口只校验了路径未校验方法。",
+        "h_en": "Direction four: method tampering",
+        "p_en": "Change GET to POST, PUT, or DELETE, turning read-only endpoints into writes. Watch for endpoints validating only the path, not the method."
+      }
+    ],
+    "refs": [
+      {
+        "name": "OWASP Broken Access Control",
+        "url": "https://owasp.org/Top10/A01_2021-Broken_Access_Control/"
+      }
+    ],
+    "tags": [
+      "自测",
+      "越权",
+      "实战"
+    ],
+    "quiz": [
+      {
+        "q": "水平越权指的是？",
+        "options": [
+          "访问管理员接口",
+          "访问同级别其他用户的资源",
+          "修改密码",
+          "提权"
+        ],
+        "answer": 1,
+        "explain": "同级用户之间的资源隔离失效。",
+        "q_en": "Horizontal privilege escalation means?",
+        "options_en": [
+          "Accessing admin endpoints",
+          "Accessing another same-level user's resources",
+          "Changing a password",
+          "Privilege escalation"
+        ],
+        "explain_en": "Resource isolation fails between peers."
+      },
+      {
+        "q": "垂直越权指的是？",
+        "options": [
+          "访问他人的订单",
+          "以低权限身份访问高权限功能",
+          "跨库查询",
+          "越狱"
+        ],
+        "answer": 1,
+        "explain": "突破角色层级的限制。",
+        "q_en": "Vertical privilege escalation means?",
+        "options_en": [
+          "Accessing someone's order",
+          "Using a low-privilege identity to reach privileged features",
+          "Cross-database queries",
+          "Jailbreak"
+        ],
+        "explain_en": "Breaking the role hierarchy limits."
+      },
+      {
+        "q": "测越权最少需要准备几个账号？",
+        "options": [
+          "1 个",
+          "2 个不同权限的账号",
+          "5 个",
+          "不需要账号"
+        ],
+        "answer": 1,
+        "explain": "需要对照才能判断差异。",
+        "q_en": "Minimum accounts needed to test privilege escalation?",
+        "options_en": [
+          "1",
+          "2 with different privileges",
+          "5",
+          "None"
+        ],
+        "explain_en": "A control is needed to compare."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "lab-check-02",
+    "kind": "lab",
+    "category": "安全自测",
+    "cwe": "CWE-502",
+    "title": "识别不安全的反序列化入口",
+    "title_en": "Spotting Unsafe Deserialization Entry Points",
+    "level": "intermediate",
+    "icon": "CHECK2",
+    "color": "test",
+    "summary": "按特征字节与协议路径两个线索排查，比逐个读代码快得多。",
+    "summary_en": "Two clues—magic bytes and protocol paths—make the search much faster.",
+    "sections": [
+      {
+        "h": "线索一 特征字节",
+        "p": "抓取应用的所有请求与响应，搜索以下特征：base64 解码后以 AC ED 开头（Java）、字符串以 O: 或 a: 开头（PHP serialize）、字节以 80 开头（Python pickle）、以 AAEAAAD 开头（.NET BinaryFormatter）、YAML 中以 ! 标记自定义类型。",
+        "h_en": "Clue one: magic bytes",
+        "p_en": "Capture all requests and responses and search for these signatures: base64 decoding to AC ED (Java), strings starting with O: or a: (PHP serialize), bytes starting with 80 (Python pickle), starting with AAEAAAD (.NET BinaryFormatter), and YAML using ! tags for custom types."
+      },
+      {
+        "h": "线索二 协议路径",
+        "p": "查看应用是否使用 RMI、JMS、AMF、ViewState、Session 存储、分布式缓存等会传输序列化对象的通道。这些通道即使不直接面向用户，也可能被间接污染。",
+        "h_en": "Clue two: protocol paths",
+        "p_en": "Review whether the application uses RMI, JMS, AMF, ViewState, session storage, or distributed caches that carry serialized objects. These channels may be indirectly tainted even if not user facing."
+      },
+      {
+        "h": "确认可利用性",
+        "p": "在测试环境替换载荷为无害的探测对象，观察响应报错中是否出现类名或调用栈。若报错暴露了反序列化的类，说明攻击者可以控制类型选择。",
+        "h_en": "Confirm exploitability",
+        "p_en": "In a test environment replace the payload with a harmless probe object and observe whether error responses expose class names or stacks. If errors reveal the deserialized class, type selection is under attacker control."
+      },
+      {
+        "h": "修复优先级",
+        "p": "公开利用链存在的组件（如旧版本 Fastjson、Jackson 开启默认类型、Shiro 默认密钥）应视为最高优先级。修复方式是升级、关闭自动类型解析、或改为 JSON。",
+        "h_en": "Fix priority",
+        "p_en": "Components with public gadgets (old Fastjson, Jackson with default typing, Shiro with default keys) are top priority. Remediate by upgrading, disabling auto type resolution, or switching to JSON."
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE-502",
+        "url": "https://cwe.mitre.org/data/definitions/502.html"
+      },
+      {
+        "name": "OWASP Deserialization Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "自测",
+      "反序列化",
+      "实战"
+    ],
+    "quiz": [
+      {
+        "q": "Java 反序列化数据的特征字节是？",
+        "options": [
+          "FF D8",
+          "AC ED",
+          "89 50 4E 47",
+          "25 50 44 46"
+        ],
+        "answer": 1,
+        "explain": "AC ED 是 Java 序列化流魔数。",
+        "q_en": "Magic bytes of Java serialized data?",
+        "options_en": [
+          "FF D8",
+          "AC ED",
+          "89 50 4E 47",
+          "25 50 44 46"
+        ],
+        "explain_en": "AC ED is the Java serialization magic."
+      },
+      {
+        "q": "PHP serialize 数据的典型开头是？",
+        "options": [
+          "O: 或 a:",
+          "{",
+          "<",
+          "#"
+        ],
+        "answer": 0,
+        "explain": "对象用 O:、数组用 a: 开头。",
+        "q_en": "Typical PHP serialize prefix?",
+        "options_en": [
+          "O: or a:",
+          "{",
+          "<",
+          "#"
+        ],
+        "explain_en": "Objects start with O:, arrays with a:."
+      },
+      {
+        "q": "确认可利用性的常用手法是？",
+        "options": [
+          "直接攻击生产",
+          "替换为无害探测对象并观察报错",
+          "扫描端口",
+          "抓包"
+        ],
+        "answer": 1,
+        "explain": "在测试环境观察类型选择是否可控。",
+        "q_en": "Common way to confirm exploitability?",
+        "options_en": [
+          "Attack production",
+          "Substitute a harmless probe and inspect errors",
+          "Port scan",
+          "Packet capture"
+        ],
+        "explain_en": "Observe in a test environment whether type selection is controllable."
+      }
+    ],
+    "related": []
+  },
+  {
+    "id": "lab-mind-01",
+    "kind": "lab",
+    "category": "思维方法",
+    "cwe": null,
+    "title": "从一条漏洞公告到一次架构改进",
+    "title_en": "From One Advisory to an Architectural Fix",
+    "level": "advanced",
+    "icon": "MIND",
+    "color": "method",
+    "summary": "把一次修补转化为一类问题的治理，这是安全工程与「打补丁」的分水岭。",
+    "summary_en": "Turn a single patch into a class-level fix; that is security engineering.",
+    "sections": [
+      {
+        "h": "第一个问题：为什么会出现",
+        "p": "修补完成后追问一层：这个缺陷属于哪个 CWE？它是在设计阶段、编码阶段还是配置阶段引入的？如果是同一类问题第三次出现，说明流程有缺口，而不是某个人不细心。",
+        "h_en": "First question: why did this happen",
+        "p_en": "After the fix, go one level deeper: which CWE does this belong to? Was it introduced in design, coding, or configuration? If the same class appears for the third time, the process has a gap, not an individual being careless."
+      },
+      {
+        "h": "第二个问题：能不能在源头拦住",
+        "p": "编码阶段引入的，考虑静态检查规则与代码模板。配置阶段引入的，考虑基线镜像与自动化检查。设计阶段引入的，考虑架构评审清单新增条目。",
+        "h_en": "Second question: can we block it at the source",
+        "p_en": "For coding issues consider static analysis rules and code templates. For configuration issues consider baseline images and automated checks. For design issues consider new architecture review checklist items."
+      },
+      {
+        "h": "第三个问题：如果再来一次会怎样",
+        "p": "假设同样的缺陷明天在另一个模块被引入，现有防线能否发现？如果答案是否定的，那这次的修补只解决了症状。",
+        "h_en": "Third question: what if it happens again tomorrow",
+        "p_en": "Assume the same defect is introduced elsewhere tomorrow. Would existing defenses find it? If not, this fix addressed a symptom only."
+      },
+      {
+        "h": "沉淀方式",
+        "p": "把结论写成可执行的检查项，纳入 CI 或评审清单，而不是写进一份无人阅读的报告。每季度回顾一次缺陷分布，调整检查项权重。",
+        "h_en": "How to institutionalize",
+        "p_en": "Turn conclusions into executable checks and put them into CI or review checklists, not a report nobody reads. Review defect distribution quarterly and adjust the weight of checks."
+      }
+    ],
+    "refs": [
+      {
+        "name": "CWE Top 25",
+        "url": "https://cwe.mitre.org/top25/"
+      },
+      {
+        "name": "NIST SSDF",
+        "url": "https://csrc.nist.gov/projects/ssdf"
+      }
+    ],
+    "tags": [
+      "方法论",
+      "架构",
+      "复盘"
+    ],
+    "quiz": [
+      {
+        "q": "同一个 CWE 反复出现，说明？",
+        "options": [
+          "运气差",
+          "流程存在缺口，需要制度化治理",
+          "人员不足",
+          "工具不够"
+        ],
+        "answer": 1,
+        "explain": "重复出现是系统性问题的信号。",
+        "q_en": "The same CWE recurring means?",
+        "options_en": [
+          "Bad luck",
+          "A process gap requiring systemic treatment",
+          "Understaffing",
+          "Insufficient tooling"
+        ],
+        "explain_en": "Recurrence signals a systemic problem."
+      },
+      {
+        "q": "修补完成后应该沉淀什么？",
+        "options": [
+          "一份报告",
+          "可执行的检查项（CI 规则 / 评审清单）",
+          "一段总结视频",
+          "一封邮件"
+        ],
+        "answer": 1,
+        "explain": "不可执行的结论无法防止复发。",
+        "q_en": "What should be institutionalized after a fix?",
+        "options_en": [
+          "A report",
+          "Executable checks (CI rules, review checklists)",
+          "A summary video",
+          "An email"
+        ],
+        "explain_en": "Non-executable conclusions cannot prevent recurrence."
+      },
+      {
+        "q": "\"假设同样的缺陷明天在别处出现\"这个问题的作用是？",
+        "options": [
+          "为了追责",
+          "检验现有防线是否足够",
+          "为了写报告",
+          "为了延长会议"
+        ],
+        "answer": 1,
+        "explain": "这是从个案走向体系的关键提问。",
+        "q_en": "Purpose of asking what if the same defect appears elsewhere tomorrow?",
+        "options_en": [
+          "Assigning blame",
+          "Testing whether current defenses suffice",
+          "Writing reports",
+          "Extending meetings"
+        ],
+        "explain_en": "This is the key question moving from case to system."
+      }
+    ],
+    "related": []
+  }
+]

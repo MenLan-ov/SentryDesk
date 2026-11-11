@@ -1,0 +1,1118 @@
+[
+  {
+    "id": "g-cve",
+    "term": "CVE",
+    "term_en": "Common Vulnerabilities and Exposures",
+    "alias": [],
+    "definition": "公开漏洞的通用编号，格式为 CVE-年份-序号。它只解决「这是哪一个漏洞」的标识问题，不提供评分与处置建议。",
+    "related": [
+      "l-cwe",
+      "l-registry"
+    ],
+    "definition_en": "The common identifier for public vulnerabilities, formatted CVE-year-number. It identifies which flaw is meant; it carries no score or remediation advice."
+  },
+  {
+    "id": "g-cwe",
+    "term": "CWE",
+    "term_en": "Common Weakness Enumeration",
+    "alias": [],
+    "definition": "软件缺陷类型的分类体系，回答「这个漏洞属于哪一类错误」。与 CVE 互补：CVE 指实例，CWE 指类型。",
+    "related": [
+      "l-cwe"
+    ],
+    "definition_en": "A classification of weakness types rather than individual vulnerabilities. One CWE can map to thousands of CVEs, which makes it the right axis for learning and for checking whether a flaw class is systemic."
+  },
+  {
+    "id": "g-cvss",
+    "term": "CVSS",
+    "term_en": "Common Vulnerability Scoring System",
+    "alias": [],
+    "definition": "标准化的漏洞严重性评分（0–10），由攻击途径、复杂度、权限、用户交互、影响范围与 CIA 三性共同决定。它不表示是否已被利用。",
+    "related": [
+      "l-cvss"
+    ],
+    "definition_en": "A framework for scoring the technical severity of a vulnerability, producing 0 to 10. It measures consequences, not the likelihood of exploitation; that is what EPSS is for."
+  },
+  {
+    "id": "g-kev",
+    "term": "KEV",
+    "term_en": "Known Exploited Vulnerabilities",
+    "alias": [],
+    "definition": "CISA 维护的「已确认在野利用」漏洞目录。条数少但信号强，命中即应优先处置，优先级高于单纯按 CVSS 分数排序。",
+    "related": [
+      "l-cvss",
+      "l-registry"
+    ],
+    "definition_en": "A catalog of vulnerabilities already observed being exploited in real attacks, with an added date and a remediation deadline. It records facts, so it outranks any predictive score."
+  },
+  {
+    "id": "g-owasp",
+    "term": "OWASP Top 10",
+    "term_en": "OWASP Top 10",
+    "alias": [],
+    "definition": "针对 Web 应用的十大安全风险清单，按出现频率与影响排序，常被用作培训与评审的基础框架。",
+    "related": [
+      "l-injection"
+    ],
+    "definition_en": "A community-maintained list of the most critical web application security risks, revised periodically. It is awareness material rather than a verification standard."
+  },
+  {
+    "id": "g-nvd",
+    "term": "NVD",
+    "term_en": "National Vulnerability Database",
+    "alias": [],
+    "definition": "NIST 维护的漏洞数据库，为 CVE 补充描述、评分与受影响配置（CPE），是漏洞信息的公共底稿。",
+    "related": [
+      "l-registry"
+    ],
+    "definition_en": "The US National Vulnerability Database, which enriches CVE records with CVSS scores, CWE classification and affected products. Broad coverage, but enrichment lags publication."
+  },
+  {
+    "id": "g-ghsa",
+    "term": "GHSA",
+    "term_en": "GitHub Security Advisory",
+    "alias": [],
+    "definition": "GitHub 维护的开源软件包级安全公告库，直接给出受影响的包名、版本区间与已修复版本，比 NVD 更贴近升级决策。",
+    "related": [
+      "l-registry"
+    ],
+    "definition_en": "GitHub-curated security advisories for open source packages, organized by ecosystem and version range. Best suited to dependency scanning because the affected versions are structured."
+  },
+  {
+    "id": "g-cpe",
+    "term": "CPE",
+    "term_en": "Common Platform Enumeration",
+    "alias": [],
+    "definition": "描述产品与版本的结构化标识格式，形如 cpe:2.3:a:vendor:product:version，漏洞公告用它声明受影响范围。",
+    "related": [
+      "l-triage"
+    ],
+    "definition_en": "A structured naming scheme for products and versions, used to link a vulnerability record to concrete software. The join key between inventories and vulnerability data."
+  },
+  {
+    "id": "g-xss",
+    "term": "XSS",
+    "term_en": "Cross-site Scripting",
+    "alias": [],
+    "definition": "把用户可控内容当作脚本在他人浏览器中执行的缺陷，分反射型、存储型、DOM 型三类。",
+    "related": [
+      "cwe-79"
+    ],
+    "definition_en": "Injecting script into a page viewed by others. The root cause is rendering untrusted input as markup instead of text."
+  },
+  {
+    "id": "g-csrf",
+    "term": "CSRF",
+    "term_en": "Cross-Site Request Forgery",
+    "alias": [],
+    "definition": "诱导已登录用户访问恶意页面，借浏览器自动携带的 Cookie 完成非预期操作的攻击。",
+    "related": [
+      "cwe-352"
+    ],
+    "definition_en": "Making a logged-in user issue a state-changing request without intending to. The defense is proving the request came from your own page."
+  },
+  {
+    "id": "g-ssrf",
+    "term": "SSRF",
+    "term_en": "Server-Side Request Forgery",
+    "alias": [],
+    "definition": "服务端按用户提供的地址发起请求，使攻击者能探测内网、访问云元数据服务、攻击内部系统。",
+    "related": [
+      "cwe-918"
+    ],
+    "definition_en": "Making the server issue a request to an address the attacker chooses, often to reach internal services or metadata endpoints."
+  },
+  {
+    "id": "g-xxe",
+    "term": "XXE",
+    "term_en": "XML External Entity",
+    "alias": [],
+    "definition": "XML 解析器解析外部实体导致的文件读取、内网探测或拒绝服务缺陷。",
+    "related": [
+      "cwe-611"
+    ],
+    "definition_en": "Abusing XML external entity processing to read local files or reach internal services. Disabling DOCTYPE removes the capability entirely."
+  },
+  {
+    "id": "g-idor",
+    "term": "IDOR",
+    "term_en": "Insecure Direct Object Reference",
+    "alias": [],
+    "definition": "通过修改请求中的对象标识访问他人资源，本质是缺少对象级授权校验。",
+    "related": [
+      "cwe-862"
+    ],
+    "definition_en": "Accessing another user object by changing an identifier. The fix is an ownership condition in the query, not a check after fetching."
+  },
+  {
+    "id": "g-rce",
+    "term": "RCE",
+    "term_en": "Remote Code Execution",
+    "alias": [],
+    "definition": "攻击者能在目标系统上执行任意代码，通常视为最高危害等级。",
+    "related": [
+      "cwe-94",
+      "cwe-78"
+    ],
+    "definition_en": "Executing arbitrary code on the target. Usually the final step of a chain rather than a single flaw."
+  },
+  {
+    "id": "g-toc",
+    "term": "TOCTOU",
+    "term_en": "Time-of-Check to Time-of-Use",
+    "alias": [],
+    "definition": "程序先检查资源状态、再使用资源，两者之间的时间窗口可被并发请求利用，是竞态条件的典型模式。",
+    "related": [
+      "cwe-362"
+    ],
+    "definition_en": "A race between checking a condition and using it. In concurrency the state can change in between, so the check no longer holds."
+  },
+  {
+    "id": "g-uaf",
+    "term": "UAF",
+    "term_en": "Use After Free",
+    "alias": [],
+    "definition": "内存被释放后指针未置空，程序继续通过它访问，可能被攻击者抢占该内存并注入受控数据。",
+    "related": [
+      "cwe-416"
+    ],
+    "definition_en": "Using memory after it was freed. A classic source of both crashes and exploitable corruption in native code."
+  },
+  {
+    "id": "g-aslr",
+    "term": "ASLR",
+    "term_en": "Address Space Layout Randomization",
+    "alias": [],
+    "definition": "每次运行随机化内存布局的防护机制，信息泄露漏洞常被用来绕过它。",
+    "related": [
+      "cwe-125"
+    ],
+    "definition_en": "Randomizing memory layout so an attacker cannot hardcode addresses. A mitigation, not a fix."
+  },
+  {
+    "id": "g-asan",
+    "term": "ASan",
+    "term_en": "AddressSanitizer",
+    "alias": [],
+    "definition": "内存错误检测工具，运行时捕获越界读写与释放后使用，通常纳入 CI 与模糊测试流程。",
+    "related": [
+      "cwe-787",
+      "cwe-125"
+    ],
+    "definition_en": "A compiler instrumentation tool that detects memory errors at runtime. Cheap to enable in tests, catches many real bugs."
+  },
+  {
+    "id": "g-fuzz",
+    "term": "Fuzzing",
+    "term_en": "Fuzz Testing",
+    "alias": [],
+    "definition": "向程序灌入大量畸形输入并观察崩溃，是发现解析类与内存类缺陷最有效的方法之一。",
+    "related": [
+      "lab-check-02"
+    ],
+    "definition_en": "Feeding malformed input automatically to find crashes. Most productive for parsers and anything handling untrusted binary formats."
+  },
+  {
+    "id": "g-sdlc",
+    "term": "SDLC",
+    "term_en": "Secure Development Lifecycle",
+    "alias": [],
+    "definition": "把安全活动嵌入需求、设计、编码、测试、发布各阶段的工程方法，强调在缺陷产生的阶段拦下它。",
+    "related": [
+      "lab-mind-01"
+    ],
+    "definition_en": "Building security activities into each development phase rather than auditing at the end. Cheaper because defects are found earlier."
+  },
+  {
+    "id": "g-iam",
+    "term": "IAM",
+    "term_en": "Identity and Access Management",
+    "alias": [],
+    "definition": "管理主体身份与其权限的系统，核心机制是认证、授权与审计三者的组合。",
+    "related": [
+      "l-auth"
+    ],
+    "definition_en": "Managing identities and their permissions. Most cloud incidents reduce to over-permission here."
+  },
+  {
+    "id": "g-mfa",
+    "term": "MFA",
+    "term_en": "Multi-Factor Authentication",
+    "alias": [],
+    "definition": "要求两种以上不同类别凭据完成认证。优先 TOTP 或硬件密钥，短信验证码易受 SIM 交换攻击。",
+    "related": [
+      "l-auth"
+    ],
+    "definition_en": "Requiring a second proof of identity. Effectiveness depends on the factor type; readable codes can be relayed."
+  },
+  {
+    "id": "g-csp",
+    "term": "CSP",
+    "term_en": "Content Security Policy",
+    "alias": [],
+    "definition": "通过响应头限制页面可加载的脚本、样式与嵌入来源，是 XSS 的纵深防御手段。",
+    "related": [
+      "cwe-79",
+      "cwe-1021"
+    ],
+    "definition_en": "A response header restricting which sources a page may load or connect to. It limits the impact of an injection but does not prevent it."
+  },
+  {
+    "id": "g-samesite",
+    "term": "SameSite",
+    "term_en": "SameSite Cookie Attribute",
+    "alias": [],
+    "definition": "Cookie 属性，控制跨站请求是否携带该 Cookie。设为 Lax 或 Strict 能挡住绝大多数 CSRF。",
+    "related": [
+      "cwe-352"
+    ],
+    "definition_en": "A cookie attribute limiting when the browser sends it on cross-site requests. Lax already blocks most cross-site form posts."
+  },
+  {
+    "id": "g-bcrypt",
+    "term": "bcrypt",
+    "term_en": "bcrypt",
+    "alias": [],
+    "definition": "自适应慢哈希算法，内置盐值并支持成本因子调整，是存储用户口令的主流选择之一。",
+    "related": [
+      "cwe-287"
+    ],
+    "definition_en": "A deliberately slow password hashing function with a built-in cost parameter and salt. Still acceptable, though Argon2id is preferred."
+  },
+  {
+    "id": "g-re2",
+    "term": "RE2",
+    "term_en": "RE2",
+    "alias": [],
+    "definition": "保证线性匹配时间的正则引擎，从算法层面消除灾难性回溯，是防御 ReDoS 的根本手段。",
+    "related": [
+      "cwe-1333"
+    ],
+    "definition_en": "A regular expression engine with linear-time matching, immune to catastrophic backtracking by design."
+  },
+  {
+    "id": "g-redos",
+    "term": "ReDoS",
+    "term_en": "Regular Expression Denial of Service",
+    "alias": [],
+    "definition": "利用存在灾难性回溯的正则表达式，用极小输入耗尽 CPU 的拒绝服务攻击。",
+    "related": [
+      "cwe-1333"
+    ],
+    "definition_en": "Catastrophic backtracking in a regular expression, letting a short input consume exponential time. The fix is removing nested quantifiers or switching engine."
+  },
+  {
+    "id": "g-auditlog",
+    "term": "审计日志",
+    "term_en": "Audit Log",
+    "alias": [],
+    "definition": "记录谁在何时对什么做了什么，是事件溯源与合规检查的基础，必须防篡改且访问受限。",
+    "related": [
+      "l-incident"
+    ],
+    "definition_en": "A record of who did what and when, kept for accountability and investigation. Value depends entirely on what is captured and how long it is retained."
+  },
+  {
+    "id": "g-pentest",
+    "term": "渗透测试",
+    "term_en": "Penetration Testing",
+    "alias": [],
+    "definition": "在授权范围内模拟攻击者手法，验证系统防御是否真实有效。与扫描工具的区别在于人工推理与组合利用。",
+    "related": [
+      "lab-check-01"
+    ],
+    "definition_en": "Authorized simulated attack to find real weaknesses. It samples the risk surface; it does not prove absence."
+  },
+  {
+    "id": "g-attack",
+    "term": "MITRE ATT&CK",
+    "term_en": "MITRE ATT&CK",
+    "alias": [],
+    "definition": "按战术与技术组织的攻击行为知识库，用于描述手法、建设检测规则与评估防御覆盖度。",
+    "related": [
+      "l-incident"
+    ],
+    "definition_en": "MITRE knowledge base of adversary behavior. Tactics describe goals, techniques describe means with T-IDs, enabling coverage measurement."
+  },
+  {
+    "id": "g-capec",
+    "term": "CAPEC",
+    "term_en": "Common Attack Pattern Enumeration and Classification",
+    "alias": [],
+    "definition": "攻击模式分类库，描述攻击者如何利用某类缺陷。CWE 说缺陷，CAPEC 说打法。",
+    "related": [
+      "l-cwe"
+    ],
+    "definition_en": "A catalog of attack patterns, one layer above weaknesses: how a class of weakness is actually exploited in practice."
+  },
+  {
+    "id": "g-pinning",
+    "term": "证书固定",
+    "term_en": "Certificate Pinning",
+    "alias": [],
+    "definition": "客户端只信任预先指定的证书或公钥，防止被伪造证书的中间人解密。实现时失败分支必须拒绝连接。",
+    "related": [
+      "cwe-295"
+    ],
+    "definition_en": "Binding a certificate or public key so a swapped certificate is rejected. Powerful but operationally risky if the pin is not rotated in time."
+  },
+  {
+    "id": "g-smuggle",
+    "term": "请求走私",
+    "term_en": "HTTP Request Smuggling",
+    "alias": [],
+    "definition": "利用前后端对报文长度解析的差异，把请求拆成两段被不同解读，从而绕过访问控制或污染缓存。",
+    "related": [
+      "cwe-20"
+    ],
+    "definition_en": "Desynchronizing how a front-end and back-end parse a request, so one request is seen as two. Arises from inconsistent framing rules."
+  },
+  {
+    "id": "g-surface",
+    "term": "攻击面",
+    "term_en": "Attack Surface",
+    "alias": [],
+    "definition": "系统中可被外部触达的入口集合，包括接口、端口、上传、第三方依赖。减少攻击面是最经济的防护。",
+    "related": [
+      "l-defense"
+    ],
+    "definition_en": "Everything an attacker can reach. Security work is largely about shrinking it rather than defending every point."
+  },
+  {
+    "id": "g-depth",
+    "term": "纵深防御",
+    "term_en": "Defense in Depth",
+    "alias": [],
+    "definition": "部署多层互补的控制措施，使任何单一控制失效时仍有后一层兜底。",
+    "related": [
+      "l-defense"
+    ],
+    "definition_en": "Layering independent controls so one failure does not grant access. Each layer must be able to fail alone and still block."
+  },
+  {
+    "id": "g-least",
+    "term": "最小权限",
+    "term_en": "Least Privilege",
+    "alias": [],
+    "definition": "每个主体只应拥有完成其职责所必需的最小权限，以限制被攻破后的影响范围。",
+    "related": [
+      "cwe-269"
+    ],
+    "definition_en": "Granting only the permissions actually needed. The practical test is whether a leak of this identity would be survivable."
+  },
+  {
+    "id": "g-failclosed",
+    "term": "失效安全",
+    "term_en": "Fail Closed",
+    "alias": [],
+    "definition": "控制措施本身出错时默认结果为拒绝而非放行，避免故障演变为安全事件。",
+    "related": [
+      "l-defense"
+    ],
+    "definition_en": "On error, deny rather than allow. Most authorization bugs are fail-open paths taken under an unexpected condition."
+  },
+  {
+    "id": "g-rotate",
+    "term": "令牌轮换",
+    "term_en": "Token Rotation",
+    "alias": [],
+    "definition": "定期或按事件更换会话令牌与密钥，使已泄露的凭据尽快失效。",
+    "related": [
+      "l-secrets"
+    ],
+    "definition_en": "Replacing credentials on a schedule or after exposure. A rotation plan that was never rehearsed does not exist."
+  },
+  {
+    "id": "g-sbom",
+    "term": "SBOM",
+    "term_en": "Software Bill of Materials",
+    "alias": [],
+    "definition": "列出软件全部组件与版本的清单，用于漏洞公开后快速判断自己是否受影响。",
+    "related": [
+      "l-triage"
+    ],
+    "definition_en": "A machine-readable inventory of components, versions and dependency edges. It fixes nothing; it makes locating affected software possible."
+  },
+  {
+    "id": "g-imds",
+    "term": "元数据服务",
+    "term_en": "Instance Metadata Service",
+    "alias": [],
+    "definition": "云主机上提供实例信息与临时凭据的本地接口（如 169.254.169.254）。SSRF 命中它往往导致云账号接管。",
+    "related": [
+      "cwe-918"
+    ],
+    "definition_en": "A link-local service on cloud hosts that returns instance identity and temporary credentials. A frequent SSRF pivot."
+  },
+  {
+    "id": "g-ir",
+    "term": "应急响应",
+    "term_en": "Incident Response",
+    "alias": [],
+    "definition": "对已发生的安全事件进行识别、遏制、根除、恢复与复盘的过程，目标是缩短影响时间并防止复发。",
+    "related": [
+      "ir-lifecycle"
+    ],
+    "definition_en": "The structured process of detecting, containing, eradicating and recovering from an incident. Order matters more than tools."
+  },
+  {
+    "id": "g-containment",
+    "term": "遏制",
+    "term_en": "Containment",
+    "alias": [],
+    "definition": "事件处置中「止血」的阶段：隔离主机、冻结账号、封禁出口，争取取证与根除的时间。",
+    "related": [
+      "ir-contain"
+    ],
+    "definition_en": "Stopping the spread before full understanding. Investigate after the bleeding stops, not before."
+  },
+  {
+    "id": "g-ioc",
+    "term": "IOC",
+    "term_en": "Indicator of Compromise",
+    "alias": [],
+    "definition": "入侵指标：恶意 IP、域名、文件哈希、注册表键等可用于识别已发生入侵的痕迹。",
+    "related": [
+      "ir-triage-first-hour"
+    ],
+    "definition_en": "Observable artifacts indicating compromise, such as hashes or addresses. Cheap to share, quick to expire."
+  },
+  {
+    "id": "g-ttp",
+    "term": "TTP",
+    "term_en": "Tactics, Techniques, and Procedures",
+    "alias": [],
+    "definition": "攻击者的战术、技术与流程，比单个 IOC 更稳定，是建设检测规则的主要依据。",
+    "related": [
+      "ir-lifecycle"
+    ],
+    "definition_en": "Adversary behavior patterns rather than artifacts. Harder to change than infrastructure, so more durable for detection."
+  },
+  {
+    "id": "g-volatile",
+    "term": "易失性数据",
+    "term_en": "Volatile Data",
+    "alias": [],
+    "definition": "重启或断电即丢失的数据：内存内容、网络连接、运行中进程。取证时必须最先采集。",
+    "related": [
+      "ir-evidence"
+    ],
+    "definition_en": "Data that disappears on reboot, such as memory and connections. Collect it first or lose it forever."
+  },
+  {
+    "id": "g-chain",
+    "term": "证据链",
+    "term_en": "Chain of Custody",
+    "alias": [],
+    "definition": "记录证据从采集到呈交的全过程：谁在何时用什么工具采集、如何存放、经过谁手。",
+    "related": [
+      "ir-evidence"
+    ],
+    "definition_en": "Documented custody of evidence showing nothing was altered. Without it, findings are not defensible."
+  },
+  {
+    "id": "g-lateral",
+    "term": "横向移动",
+    "term_en": "Lateral Movement",
+    "alias": [],
+    "definition": "攻击者从一个已控制的主机向网络内其他主机扩散的过程，常借助凭据复用与远程管理协议。",
+    "related": [
+      "ir-triage-first-hour"
+    ],
+    "definition_en": "Moving from one compromised host to others. Blocked mainly by segmentation and by not reusing credentials everywhere."
+  },
+  {
+    "id": "g-c2",
+    "term": "C2",
+    "term_en": "Command and Control",
+    "alias": [],
+    "definition": "攻击者用于控制被入侵主机的通道，常表现为周期性外联。封禁出口的主要目标之一。",
+    "related": [
+      "ir-contain"
+    ],
+    "definition_en": "The channel an attacker uses to control compromised hosts. Detection relies on behavioral anomalies rather than fixed addresses."
+  },
+  {
+    "id": "g-bcp",
+    "term": "业务连续性",
+    "term_en": "Business Continuity",
+    "alias": [],
+    "definition": "在事件或灾难中维持关键业务运转的能力，与应急响应配合决定恢复优先级。",
+    "related": [
+      "ir-lifecycle"
+    ],
+    "definition_en": "Keeping critical operations running during disruption. Security decisions are constrained by it in practice."
+  },
+  {
+    "id": "g-postmortem",
+    "term": "复盘",
+    "term_en": "Post-mortem",
+    "alias": [],
+    "definition": "事件结束后的回顾，产出应是可执行、有归属的改进项，而非描述性报告。",
+    "related": [
+      "ir-lifecycle"
+    ],
+    "definition_en": "A blameless review after an incident focused on what made the failure possible. Value comes from concrete follow-up actions with owners."
+  },
+  {
+    "id": "g-epss",
+    "term": "EPSS",
+    "term_en": "Exploit Prediction Scoring System",
+    "alias": [
+      "EPSS（利用预测评分系统）",
+      "EP",
+      "利用预测"
+    ],
+    "definition": "由 FIRST 维护的预测模型，为每个 CVE 给出未来 30 天内被利用的概率（0–1）。它衡量「会不会发生」，与衡量「后果有多严重」的 CVSS 互补，两者不能互相替代。",
+    "related": [
+      "intel-cvss4",
+      "intel-kev",
+      "cloud-epss-context"
+    ],
+    "definition_en": "A FIRST-maintained model giving each CVE a probability of exploitation within 30 days. It answers whether something will happen, complementing CVSS severity."
+  },
+  {
+    "id": "g-vex",
+    "term": "VEX",
+    "term_en": "Vulnerability Exploitability eXchange",
+    "alias": [
+      "VEX（可利用性交换）",
+      "可利用性声明"
+    ],
+    "definition": "由供应方或资产所有者出具的机器可读声明，对每个「漏洞—产品」组合给出受影响、不受影响、已修复、待评估四种状态之一。用于批量关闭静态 SBOM 造成的误报。",
+    "related": [
+      "sup-sbom",
+      "intel-vex"
+    ],
+    "definition_en": "A machine-readable statement of whether a product is affected by a specific vulnerability, with a justification. Used to close false positives from static inventories in bulk."
+  },
+  {
+    "id": "g-sbom-cn",
+    "term": "软件物料清单",
+    "term_en": "Software Bill of Materials",
+    "alias": [
+      "SBOM",
+      "组件清单",
+      "BOM"
+    ],
+    "definition": "记录软件中全部第三方组件、版本与依赖关系的机器可读清单。它不修复漏洞，作用是让「我是否受这个 CVE 影响」这一问题可以被快速回答。主流格式为 SPDX 与 CycloneDX。",
+    "related": [
+      "sup-sbom",
+      "intel-vex"
+    ],
+    "definition_en": "An inventory of all third-party components, versions and dependency relations. Its value depends on being continuously matched against vulnerability feeds."
+  },
+  {
+    "id": "g-slsa",
+    "term": "SLSA",
+    "term_en": "Supply-chain Levels for Software Artifacts",
+    "alias": [
+      "SLSA（供应链等级）"
+    ],
+    "definition": "一套用分级方式描述构建过程可信度的框架，Build track 分 L0–L3。等级越高，篡改产物所需的成本越高；关键在于 provenance 由谁签发、以及构建期能否访问长期凭据。",
+    "related": [
+      "sup-slsa",
+      "sup-artifact-sign"
+    ],
+    "definition_en": "A framework grading build trustworthiness from L0 to L3. Higher levels raise the cost of tampering; the key questions are who signs provenance and whether long-lived credentials are reachable during the build."
+  },
+  {
+    "id": "g-provenance",
+    "term": "来源证明",
+    "term_en": "Provenance Attestation",
+    "alias": [
+      "provenance",
+      "构建证明"
+    ],
+    "definition": "一份签名的构建事实声明，记录触发者、源码 commit、构建平台、构建步骤与产物摘要。校验时必须同时确认签名可信与摘要匹配，任一不成立就应拒绝部署。",
+    "related": [
+      "sup-slsa",
+      "sup-artifact-sign"
+    ],
+    "definition_en": "A signed claim of build facts: who triggered it, from which commit, on which platform, producing which digest. Verification needs both a trusted signature and a matching digest."
+  },
+  {
+    "id": "g-keyless",
+    "term": "无密钥签名",
+    "term_en": "Keyless Signing",
+    "alias": [
+      "keyless"
+    ],
+    "definition": "用短期证书把构建身份绑定到签名事件，并将事件写入公开透明日志的签名方式。信任锚从「密钥保管」转为「身份 + 透明度」，避免长期私钥泄露的风险。",
+    "related": [
+      "sup-artifact-sign"
+    ],
+    "definition_en": "Signing with a short-lived certificate bound to a build identity, recorded in a public transparency log. The trust anchor shifts from key custody to identity plus transparency."
+  },
+  {
+    "id": "g-dependency-confusion",
+    "term": "依赖混淆",
+    "term_en": "Dependency Confusion",
+    "alias": [
+      "依赖混淆攻击",
+      "命名混淆"
+    ],
+    "definition": "当内部包名未在公共仓库占位、且解析策略同时查询内外源并取最高版本时，攻击者注册同名高版本包即可让构建装上外部代码。修复的根本手段是把内部作用域绑定到私有源。",
+    "related": [
+      "sup-confusion"
+    ],
+    "definition_en": "Registering a same-named higher-version package publicly so a resolver that checks both sources installs foreign code. Fixed by binding internal scopes to the private registry."
+  },
+  {
+    "id": "g-phantom-dep",
+    "term": "幽灵依赖",
+    "term_en": "Phantom Dependency",
+    "alias": [
+      "隐性依赖"
+    ],
+    "definition": "代码 import 了某个包但未在清单中声明，仅因被其他依赖间接安装而可用。一旦上游变更就会构建断裂，属于隐性契约。",
+    "related": [
+      "sup-transitive"
+    ],
+    "definition_en": "A package imported by code but never declared, working only because something else installed it indirectly. An implicit contract that can vanish."
+  },
+  {
+    "id": "g-transitive",
+    "term": "传递依赖",
+    "term_en": "Transitive Dependency",
+    "alias": [
+      "间接依赖"
+    ],
+    "definition": "由直接依赖再引入的依赖。实际安装数量通常远大于直接声明数量，绝大多数漏洞来自这一层，评估影响必须按实际解析版本判断。",
+    "related": [
+      "sup-transitive"
+    ],
+    "definition_en": "Dependencies pulled in by your dependencies. They dominate the installed count and most vulnerabilities live here."
+  },
+  {
+    "id": "g-mfa-2",
+    "term": "持续比对",
+    "term_en": "Continuous Matching",
+    "alias": [
+      "SBOM 持续比对"
+    ],
+    "definition": "在漏洞库更新后自动回查历史 SBOM 的机制。SBOM 的价值来自被持续消费，只在发布时生成一次、之后无人比对的清单等于没有。",
+    "related": [
+      "sup-sbom"
+    ],
+    "definition_en": "Automatically re-checking historical inventories when vulnerability feeds update. An SBOM nobody re-correlates provides no value."
+  },
+  {
+    "id": "g-cvss4",
+    "term": "CVSS v4.0",
+    "term_en": "CVSS v4.0",
+    "alias": [
+      "CVSS 4.0"
+    ],
+    "definition": "CVSS 的第四个大版本，把威胁指标提升为一等指标，并引入「后续系统影响」的概念，同时扩展了对工控与安全设备的评估能力。其分值与 v3.x 语义不同，不可跨版本直接比较。",
+    "related": [
+      "intel-cvss4"
+    ],
+    "definition_en": "The fourth major CVSS version, promoting threat metrics to first class and adding downstream system impact. Its scores are not comparable with v3.x."
+  },
+  {
+    "id": "g-imds-instance",
+    "term": "实例元数据服务",
+    "term_en": "Instance Metadata Service",
+    "alias": [
+      "IMDS",
+      "元数据地址"
+    ],
+    "definition": "云主机上仅本机可达的内部服务，可返回实例身份与临时凭据。常被 SSRF 利用作为从 Web 漏洞到云账户失守的跳板，防护手段包括强制会话令牌与最小权限角色。",
+    "related": [
+      "cloud-ssrf-meta"
+    ],
+    "definition_en": "A host-local service returning instance identity and temporary credentials. Protected by session tokens and minimal role permissions."
+  },
+  {
+    "id": "g-imdsv2",
+    "term": "会话令牌模式",
+    "term_en": "Session Token Mode",
+    "alias": [
+      "IMDSv2"
+    ],
+    "definition": "要求访问元数据服务时必须携带会话令牌的机制，使无令牌的简单请求直接失败，从而阻断最典型的 SSRF 利用链路。",
+    "related": [
+      "cloud-ssrf-meta"
+    ],
+    "definition_en": "Requiring a session token to reach the metadata service, so simple tokenless requests fail and the typical SSRF chain breaks."
+  },
+  {
+    "id": "g-bola",
+    "term": "对象级授权失效",
+    "term_en": "Broken Object Level Authorization",
+    "alias": [
+      "BOLA",
+      "IDOR 变体"
+    ],
+    "definition": "API 场景中最常见的越权类型：接口正确校验了身份，却没有校验请求的对象是否属于该身份。功能测试用自有 id 时无法发现，必须以两个账号交叉访问验证。",
+    "related": [
+      "api-bola"
+    ],
+    "definition_en": "The most common API authorization flaw: identity is checked but object ownership is not. Functional tests using your own ids never catch it."
+  },
+  {
+    "id": "g-bfla",
+    "term": "功能级授权失效",
+    "term_en": "Broken Function Level Authorization",
+    "alias": [
+      "BFLA"
+    ],
+    "definition": "接口未校验调用方是否有权执行该功能，典型表现是普通用户可以直接调用管理类接口。与对象级授权的区别在于判断对象是「某个功能」而非「某条数据」。",
+    "related": [
+      "api-bola",
+      "api-gateway-pattern"
+    ],
+    "definition_en": "The endpoint does not check whether the caller may perform this function, so a normal user reaches admin-only operations."
+  },
+  {
+    "id": "g-mass-assignment",
+    "term": "批量赋值",
+    "term_en": "Mass Assignment",
+    "alias": [
+      "自动绑定漏洞",
+      "属性覆盖"
+    ],
+    "definition": "框架把请求体整体绑定到数据模型，导致客户端可写入本不该控制的字段（如角色、余额）。解法是显式请求模型白名单，而非事后过滤。",
+    "related": [
+      "api-mass-assign"
+    ],
+    "definition_en": "Auto-binding the whole request body onto a model, letting a client write fields it should not control. Fixed with an explicit request model."
+  },
+  {
+    "id": "g-excessive-exposure",
+    "term": "过量数据暴露",
+    "term_en": "Excessive Data Exposure",
+    "alias": [
+      "响应字段过多"
+    ],
+    "definition": "接口返回整个实体而非显式响应模型，导致内部字段、他人信息被一并下发。问题不会立刻报错，只在将来新增字段时静默泄露。",
+    "related": [
+      "api-mass-assign"
+    ],
+    "definition_en": "Returning the whole entity instead of an explicit response model, leaking internal fields now or after a future column is added."
+  },
+  {
+    "id": "g-api-inventory",
+    "term": "接口资产清单",
+    "term_en": "API Inventory",
+    "alias": [
+      "接口清单"
+    ],
+    "definition": "记录全部接口的路径、方法、负责人、暴露面、鉴权方式与最近访问时间的清单。没有清单就无法系统性地发现影子接口，只能抽查。",
+    "related": [
+      "api-inventory"
+    ],
+    "definition_en": "A record of every endpoint with owner, exposure, auth scheme and last access. Without it shadow endpoints can only be spot-checked."
+  },
+  {
+    "id": "g-shadow-api",
+    "term": "影子接口",
+    "term_en": "Shadow API",
+    "alias": [
+      "影子端点",
+      "僵尸接口"
+    ],
+    "definition": "存在但不在文档与监控覆盖范围内的接口，通常来自调试遗留、旧版本兼容路径或误暴露的内部服务。它们既不被加固也不被打补丁。",
+    "related": [
+      "api-inventory"
+    ],
+    "definition_en": "An endpoint present but absent from documentation and monitoring, usually a debug leftover or an old compatibility path. Neither hardened nor patched."
+  },
+  {
+    "id": "g-rate-limit-account",
+    "term": "账户维度限流",
+    "term_en": "Per-Account Rate Limiting",
+    "alias": [
+      "按身份限流"
+    ],
+    "definition": "以账户而非 IP 为键的限流方式。IP 在移动网络与办公网中高度共享，按 IP 限流会误伤正常用户，且攻击者换 IP 即可绕过。两者应叠加使用。",
+    "related": [
+      "api-resource-consumption",
+      "cloud-iam-least"
+    ],
+    "definition_en": "Rate limiting keyed by account rather than IP. IPs are shared and rotatable; identity is not. Use both layers."
+  },
+  {
+    "id": "g-cursor-paging",
+    "term": "游标翻页",
+    "term_en": "Cursor Pagination",
+    "alias": [
+      "keyset 分页"
+    ],
+    "definition": "用「上一页最后一条的键」而不是偏移量来取下一页的分页方式。深偏移会让数据库扫描量随页数线性增长，游标分页可避免这一成本。",
+    "related": [
+      "api-resource-consumption"
+    ],
+    "definition_en": "Paging by the last seen key instead of an offset. Deep offsets make scan cost grow linearly with page number."
+  },
+  {
+    "id": "g-cost-visibility",
+    "term": "成本可见性",
+    "term_en": "Cost Visibility",
+    "alias": [
+      "资源成本量化"
+    ],
+    "definition": "为每个接口标注预估资源成本并统计实际消耗的做法。它是设定合理资源上限的前提；没有成本数据时，限流阈值只能靠猜。",
+    "related": [
+      "api-resource-consumption"
+    ],
+    "definition_en": "Annotating and measuring per-endpoint resource cost. Without it any limit is a guess."
+  },
+  {
+    "id": "g-biz-flow-abuse",
+    "term": "业务流滥用",
+    "term_en": "Business Flow Abuse",
+    "alias": [
+      "自动化业务滥用",
+      "羊毛党"
+    ],
+    "definition": "所有请求均合法，但通过自动化按高频重复正常业务动作以获取不当利益的行为。检测依赖行为序列与频率分布基线，而非单请求特征。",
+    "related": [
+      "api-business-flow"
+    ],
+    "definition_en": "Repeating legitimate business actions at machine speed for profit. Every request is valid; the abuse is in sequence and rate."
+  },
+  {
+    "id": "g-check-then-act",
+    "term": "先查后写竞态",
+    "term_en": "Check-Then-Act Race",
+    "alias": [
+      "检查后使用竞态"
+    ],
+    "definition": "先判断条件再执行动作的实现方式，在并发下两个请求可能同时通过判断。限领一次这类规则必须由数据库唯一约束兜底。",
+    "related": [
+      "api-business-flow",
+      "cwe-362"
+    ],
+    "definition_en": "Checking a condition then acting on it, where concurrency can invalidate the check. Enforce with a unique constraint instead."
+  },
+  {
+    "id": "g-gateway-authz",
+    "term": "网关鉴权边界",
+    "term_en": "Gateway Authorization Boundary",
+    "alias": [
+      "网关职责边界"
+    ],
+    "definition": "网关擅长认证、限流、协议与体积校验，但无法判断对象归属，因为需要业务数据上下文。把授权全部推给网关是大量越权漏洞的根源。",
+    "related": [
+      "api-gateway-pattern"
+    ],
+    "definition_en": "A gateway handles authentication, rate limiting and size checks but cannot judge ownership, which needs business data. Delegating authorization there causes many bugs."
+  },
+  {
+    "id": "g-offline-first",
+    "term": "离线优先",
+    "term_en": "Offline-First",
+    "alias": [
+      "本地优先",
+      "local-first"
+    ],
+    "definition": "所有核心功能在无网络时可用、数据以本地为唯一事实来源的设计取向。其安全收益是运行时不存在常驻服务端组件，攻击窗口从持续开放收缩为用户主动触发的数秒。",
+    "related": [
+      "cloud-offline-design"
+    ],
+    "definition_en": "A design where every core feature works without a network and the local store is the source of truth. The security benefit is a much smaller attack window."
+  },
+  {
+    "id": "g-local-first",
+    "term": "本地优先",
+    "term_en": "Local-First",
+    "alias": [
+      "数据不出本机"
+    ],
+    "definition": "数据默认只保存在使用者本机、不经过任何远程服务的设计原则。在受限场景中不只是体验选择，而是把数据出境、第三方处理等一整类合规义务从架构上消除。",
+    "related": [
+      "cloud-offline-design",
+      "cloud-local-data"
+    ],
+    "definition_en": "Data stays on the user machine by default with no remote service. In restricted settings this removes a whole class of compliance obligations architecturally."
+  },
+  {
+    "id": "g-static-encryption",
+    "term": "静态加密",
+    "term_en": "Encryption at Rest",
+    "alias": [
+      "落盘加密",
+      "存储加密"
+    ],
+    "definition": "对持久化存储的数据进行加密。判断是否需要的标准不是数据重要性，而是泄露后能否反推出使用者的意图或关注点。",
+    "related": [
+      "cloud-local-data"
+    ],
+    "definition_en": "Encrypting persisted data. The test is not importance but whether a leak reveals the user intent."
+  },
+  {
+    "id": "g-credential-store",
+    "term": "系统凭据库",
+    "term_en": "OS Credential Store",
+    "alias": [
+      "凭据管理器"
+    ],
+    "definition": "由操作系统按用户账户保护密钥的设施，Windows 为 DPAPI 或凭据管理器、macOS 为 Keychain、Linux 为 Secret Service。程序只持有句柄，不持有密钥本身。",
+    "related": [
+      "cloud-local-data",
+      "cloud-keymgmt"
+    ],
+    "definition_en": "OS-provided storage protecting keys per user account: DPAPI on Windows, Keychain on macOS, Secret Service on Linux. The app holds a handle, not the key."
+  },
+  {
+    "id": "g-rotation",
+    "term": "密钥轮换",
+    "term_en": "Key Rotation",
+    "alias": [
+      "凭据轮换"
+    ],
+    "definition": "按计划更换密钥的过程。判断轮换方案是否真实存在的标准是：能否在不停止服务的情况下完成一次轮换。共用密钥导致的轮换成本过高，最终会演变为永不轮换。",
+    "related": [
+      "cloud-keymgmt"
+    ],
+    "definition_en": "Scheduled or incident-driven key replacement. The real test is whether it can be done without stopping service."
+  },
+  {
+    "id": "g-multi-stage",
+    "term": "多阶段构建",
+    "term_en": "Multi-Stage Build",
+    "alias": [
+      "分阶段构建"
+    ],
+    "definition": "把编译环境与运行环境分离的镜像构建方式，使工具链与构建期凭据不进入最终镜像。镜像层是叠加保留的，事后删除无法清除已写入的内容。",
+    "related": [
+      "cloud-container"
+    ],
+    "definition_en": "Separating build and runtime environments so toolchains and build secrets never enter the final image. Image layers are additive, so later deletion does not remove content."
+  },
+  {
+    "id": "g-distroless",
+    "term": "无发行版镜像",
+    "term_en": "Distroless Image",
+    "alias": [
+      "精简基础镜像"
+    ],
+    "definition": "只包含运行时依赖、不含包管理器与 shell 的基础镜像。它能显著缩小攻击面，配合非 root 运行与只读根文件系统构成容器最小基线。",
+    "related": [
+      "cloud-container"
+    ],
+    "definition_en": "A base image with only runtime dependencies and no shell or package manager. Pairs with non-root execution and a read-only root filesystem."
+  },
+  {
+    "id": "g-ipc-boundary",
+    "term": "IPC 安全边界",
+    "term_en": "IPC Security Boundary",
+    "alias": [
+      "进程间通信边界"
+    ],
+    "definition": "桌面应用中前端与原生层之间的调用通道。每个暴露给前端的命令都相当于一个本地 API 端点，由于本地应用通常无调用方认证，所有参数必须视为不可信。",
+    "related": [
+      "cloud-desktop-surface"
+    ],
+    "definition_en": "The channel between a desktop frontend and its native layer. Every exposed command is a local API endpoint with no caller authentication, so all arguments are untrusted."
+  },
+  {
+    "id": "g-path-traversal-check",
+    "term": "路径收敛校验",
+    "term_en": "Path Confinement",
+    "alias": [
+      "路径白名单"
+    ],
+    "definition": "对文件类接口的参数做两层校验：先按字符白名单拒绝可疑输入，再对规范化后的真实路径做目录前缀确认，以防符号链接逃逸。",
+    "related": [
+      "cloud-desktop-surface",
+      "cwe-22"
+    ],
+    "definition_en": "Two-layer validation for file arguments: reject by character allowlist, then confirm the normalized real path stays inside the target directory."
+  },
+  {
+    "id": "g-attck",
+    "term": "ATT&CK",
+    "term_en": "Adversarial Tactics, Techniques, and Common Knowledge",
+    "alias": [
+      "ATT&CK 框架"
+    ],
+    "definition": "MITRE 维护的攻击行为知识库。战术描述目的（为什么做），技术描述手段（怎么做）并带 Txxxx 编号，使不同来源的情报能落在同一坐标系上做统计与对齐。",
+    "related": [
+      "intel-attck-map",
+      "ti-cyber-kill-chain"
+    ],
+    "definition_en": "MITRE knowledge base of adversary behavior. Tactics describe goals and techniques describe means, giving different sources one coordinate system."
+  },
+  {
+    "id": "g-source-reliability",
+    "term": "来源可靠性",
+    "term_en": "Source Reliability",
+    "alias": [
+      "情报可信度"
+    ],
+    "definition": "对情报来源与信息准确性分别分级评估的做法。核心纪律是交叉验证要求来源之间互不依赖——两家媒体转载同一通稿不算两条来源。",
+    "related": [
+      "intel-source-quality"
+    ],
+    "definition_en": "Scoring source reliability and information accuracy separately. Cross-verification requires sources that do not depend on each other."
+  },
+  {
+    "id": "g-time-decay",
+    "term": "时效衰减",
+    "term_en": "Temporal Decay",
+    "alias": [
+      "情报过期"
+    ],
+    "definition": "情报价值随时间下降且不同种类衰减速度差异很大的特性。因此「最后更新时间」必须作为必填字段，界面应让人一眼看出信息有多旧。",
+    "related": [
+      "intel-source-quality"
+    ],
+    "definition_en": "Intelligence value drops over time at very different rates, so last-updated must be a required field and staleness must be visible."
+  },
+  {
+    "id": "g-alias-table",
+    "term": "编号别名表",
+    "term_en": "Identifier Alias Table",
+    "alias": [
+      "别名映射"
+    ],
+    "definition": "记录同一漏洞在不同体系中多套编号等价关系的表。用来避免用另一套编号查询时误判为数据缺失。",
+    "related": [
+      "intel-cve-lifecycle"
+    ],
+    "definition_en": "A record mapping equivalent identifiers across systems, preventing false missing-data conclusions when querying with another id."
+  },
+  {
+    "id": "g-unscored",
+    "term": "未评分状态",
+    "term_en": "Unscored State",
+    "alias": [
+      "待补全评分"
+    ],
+    "definition": "漏洞编号先公开、评分等分析后补齐所导致的正常中间状态。必须与 0 分区分建模，界面应分区展示并标注待补全，而非沉底或留白。",
+    "related": [
+      "intel-cve-lifecycle"
+    ],
+    "definition_en": "The normal intermediate state where an identifier is published before enrichment. It must be modeled distinctly from a zero score."
+  },
+  {
+    "id": "g-tiering",
+    "term": "分层处置",
+    "term_en": "Tiered Triage",
+    "alias": [
+      "分级队列"
+    ],
+    "definition": "把情报输出分为必须今天处理、本周评估、仅记录三层的做法，典型比例接近 1:5:100。相比单一阈值，分层避免了要么漏报要么淹没的两难。",
+    "related": [
+      "intel-triage-scale"
+    ],
+    "definition_en": "Splitting output into act today, evaluate this week, and record only, typically near 1:5:100. It avoids the miss-or-flood tradeoff of a single threshold."
+  },
+  {
+    "id": "g-delta-detection",
+    "term": "变化检测",
+    "term_en": "Change Detection",
+    "alias": [
+      "增量差分"
+    ],
+    "definition": "每次采集与上一次结果做差分、只把变化推给人的做法。多数条目日间内容不变，差分能把信息量下降一到两个数量级而不漏关键事件。",
+    "related": [
+      "intel-triage-scale",
+      "l-registry"
+    ],
+    "definition_en": "Diffing each collection run against the previous one and surfacing only changes. It cuts volume by one to two orders of magnitude without losing critical events."
+  }
+]

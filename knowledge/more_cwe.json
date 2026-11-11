@@ -1,0 +1,1858 @@
+[
+  {
+    "id": "cwe-77",
+    "kind": "cwe",
+    "category": "注入类",
+    "cwe": "CWE-77",
+    "title": "命令注入（通用）",
+    "title_en": "Command Injection",
+    "level": "intermediate",
+    "icon": "CMD2",
+    "color": "injection",
+    "summary": "程序把外部数据拼进命令字符串并交给系统执行，攻击者可追加任意指令。",
+    "summary_en": "External data concatenated into a command string lets attackers append instructions.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "与 CWE-78 同源但更宽泛：凡是将外部输入与命令语法拼接的位置都算，包括 shell 脚本、Windows 批处理、定时任务的命令行、CI 流水线脚本。拼接点可能是 exec、system、popen、反引号，也可能是配置文件模板。",
+        "h_en": "Principle",
+        "p_en": "Same root as CWE-78 but broader: anywhere external input is concatenated into command syntax, including shell scripts, Windows batch files, cron command lines, and CI pipeline scripts. The concatenation point may be exec, system, popen, backticks, or a config template."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "开发时用命令行做原型；把用户提供的文件名、URL、分支名传进脚本；认为「已经用引号包起来」就足够，却没处理输入自身含引号；CI 里把分支名直接插进 shell 脚本。",
+        "h_en": "Why it happens",
+        "p_en": "Command lines used to prototype; user-supplied filenames, URLs, or branch names passed into scripts; assuming quoting is sufficient without handling quotes in input; branch names interpolated straight into CI shell steps."
+      },
+      {
+        "h": "如何发现",
+        "p": "在可疑参数处填 ; id、| whoami、&& sleep 10、$(id)、`id`、%0a id。观察命令输出是否出现在响应里，或是否出现可感知延迟。CI 场景下可用 -n 之类的参数注入尝试改变命令语义。",
+        "h_en": "How to find it",
+        "p_en": "Submit ; id, | whoami, && sleep 10, $(id), and %0a id at suspicious parameters. Watch for command output in responses or perceptible delay. In CI, try argument injection like -n to change command semantics."
+      },
+      {
+        "h": "解决办法",
+        "p": "改用不经过 shell 的参数数组接口。必须拼接时，对参数做严格白名单（仅字母数字与少数符号）。把用户输入作为环境变量传递，而不是拼进命令文本。CI 场景中对分支名、标签名做正则校验并加引号。",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "分支名直接插入",
+            "bad": "echo \"deploy $BRANCH\" && ./deploy.sh $BRANCH",
+            "good": "case \"$BRANCH\" in\n  main|release/*) ./deploy.sh \"$BRANCH\" ;;\n  *) echo \"invalid branch\"; exit 1 ;;\nesac",
+            "note": "先白名单校验，再以变量形式传入，不做字符串拼接",
+            "title_en": "Branch name inserted directly",
+            "note_en": "Validate against an allowlist, then pass as a variable — never concatenate"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use argument-array APIs that bypass the shell. When concatenation is unavoidable, strictly whitelist parameters (alphanumerics and a few symbols). Pass user input as environment variables instead of command text. In CI, regex-validate and quote branch and tag names."
+      },
+      {
+        "h": "验证",
+        "p": "重放探测载荷，应被当作字面量处理。检查 CI 定义里所有 $ 变量插值是否都带引号与校验。",
+        "h_en": "Verify",
+        "p_en": "Replay probes; they should be treated as literals. Confirm every $ interpolation in CI definitions is quoted and validated."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-77",
+        "url": "https://cwe.mitre.org/data/definitions/77.html"
+      }
+    ],
+    "tags": [
+      "注入",
+      "系统"
+    ],
+    "quiz": [
+      {
+        "q": "为什么把用户输入放进环境变量比拼进命令更安全？",
+        "options": [
+          "速度更快",
+          "变量值不参与命令语法解析",
+          "压缩体积",
+          "兼容性更好"
+        ],
+        "answer": 1,
+        "explain": "环境变量是数据位置，shell 不会二次解释其内容。",
+        "q_en": "Why is passing input as an environment variable safer than concatenating it into a command?",
+        "options_en": [
+          "Faster",
+          "The value does not participate in command syntax parsing",
+          "Smaller payload",
+          "Better compatibility"
+        ],
+        "explain_en": "Environment variables are data slots; the shell does not re-interpret their contents."
+      },
+      {
+        "q": "CI 里分支名未校验直接进脚本，风险是？",
+        "options": [
+          "构建变慢",
+          "分支名可含分号等字符，导致任意命令执行",
+          "无法缓存",
+          "日志变多"
+        ],
+        "answer": 1,
+        "explain": "分支名由推送者控制，是可达的注入点。",
+        "q_en": "Risk of an unvalidated branch name reaching a CI script?",
+        "options_en": [
+          "Slower builds",
+          "Branch names can contain semicolons and other metacharacters, enabling arbitrary command execution",
+          "No caching",
+          "More logs"
+        ],
+        "explain_en": "Branch names are controlled by the pusher and are a reachable injection point."
+      },
+      {
+        "q": "参数数组方式为什么能防注入？",
+        "options": [
+          "因为它加密",
+          "因为不经过 shell 分词，分隔符失去意义",
+          "因为更快",
+          "因为限制长度"
+        ],
+        "answer": 1,
+        "explain": "shell 元字符只在 shell 解析阶段才有效。",
+        "q_en": "Why does the argument-array approach prevent injection?",
+        "options_en": [
+          "It encrypts",
+          "It bypasses shell tokenization, so separators lose meaning",
+          "It is faster",
+          "It limits length"
+        ],
+        "explain_en": "Shell metacharacters only matter during shell parsing."
+      }
+    ]
+  },
+  {
+    "id": "cwe-352-x",
+    "kind": "cwe",
+    "category": "Web 安全",
+    "cwe": "CWE-384",
+    "title": "会话固定",
+    "title_en": "Session Fixation",
+    "level": "intermediate",
+    "icon": "FIX",
+    "color": "auth",
+    "summary": "登录前后会话标识不变，攻击者可预先设置一个已知的会话 ID，等受害者登录后直接复用。",
+    "summary_en": "The session identifier is not rotated on login, letting attackers reuse a known ID.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "如果应用在登录成功后沿用登录前的会话 ID，攻击者可以先访问站点拿到一个合法的匿名会话 ID，再诱导受害者用这个 ID 登录（例如通过 URL 传递或设置 Cookie）。受害者一旦登录，该 ID 就成为已认证会话，攻击者直接用同一 ID 即可接管。",
+        "h_en": "Principle",
+        "p_en": "If the application keeps the same session ID across login, an attacker can obtain a valid anonymous session ID, then trick the victim into logging in with it via a URL parameter or Set-Cookie. Once the victim logs in, that ID becomes authenticated and the attacker reuses it for takeover."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "框架默认不轮换会话 ID；为了「保持购物车」而刻意复用；会话 ID 允许由客户端通过 URL 参数指定；登录逻辑只更新了服务端的用户关联，没换 ID。",
+        "h_en": "Why it happens",
+        "p_en": "Frameworks do not rotate session IDs by default; deliberately reused to preserve shopping carts; session IDs accepted from URL parameters; login only updates the server-side user mapping without changing the ID."
+      },
+      {
+        "h": "如何发现",
+        "p": "记录登录前后的 Cookie 值，比较是否变化。如果完全相同，就存在固定风险。再测试是否可通过 URL 参数指定会话 ID。",
+        "h_en": "How to find it",
+        "p_en": "Record cookie values before and after login and compare. Identical means fixation risk. Then test whether the session ID can be supplied via URL parameter."
+      },
+      {
+        "h": "解决办法",
+        "p": "登录成功、权限提升、密码修改等敏感节点强制轮换会话 ID。会话 ID 只由服务端生成，不接受客户端提供。设置 Session 超时与空闲回收。Cookie 加 HttpOnly 与 Secure。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "登录后轮换",
+            "bad": "session['user_id'] = user.id  # reuses the old session id",
+            "good": "session.regenerate_id()  # rotate the id first\nsession['user_id'] = user.id",
+            "note": "轮换后再写入身份，旧 ID 立即失效",
+            "title_en": "Rotation after login",
+            "note_en": "Rotate before writing identity so the old id dies immediately"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Force session ID rotation on login, privilege change, and password change. Generate session IDs server-side only, never accepting client-supplied values. Set session timeouts and idle reclamation. Mark cookies HttpOnly and Secure."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-384",
+        "url": "https://cwe.mitre.org/data/definitions/384.html"
+      },
+      {
+        "name": "OWASP Session Management",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "会话",
+      "认证"
+    ],
+    "quiz": [
+      {
+        "q": "判断是否存在会话固定的最简单方法是？",
+        "options": [
+          "看代码行数",
+          "比较登录前后的会话 ID 是否变化",
+          "看是否用 HTTPS",
+          "看 Cookie 数量"
+        ],
+        "answer": 1,
+        "explain": "ID 不变即为风险信号。",
+        "q_en": "Simplest way to detect session fixation?",
+        "options_en": [
+          "Count code lines",
+          "Compare session IDs before and after login",
+          "Check for HTTPS",
+          "Count cookies"
+        ],
+        "explain_en": "An unchanged ID is the risk signal."
+      },
+      {
+        "q": "会话 ID 应该由谁生成？",
+        "options": [
+          "客户端指定",
+          "仅由服务端用密码学随机数生成",
+          "从用户名派生",
+          "用时间戳"
+        ],
+        "answer": 1,
+        "explain": "客户端可控的 ID 等于把会话交给攻击者。",
+        "q_en": "Who should generate session IDs?",
+        "options_en": [
+          "The client",
+          "Only the server, using a cryptographically secure random source",
+          "Derive from username",
+          "Use timestamps"
+        ],
+        "explain_en": "Client-controlled IDs hand the session to attackers."
+      },
+      {
+        "q": "敏感操作（改密码）后应该？",
+        "options": [
+          "保持不变",
+          "重新轮换会话并重新认证",
+          "清空所有 Cookie",
+          "延长有效期"
+        ],
+        "answer": 1,
+        "explain": "权限变更点必须重新建立会话。",
+        "q_en": "What should happen after sensitive actions like password change?",
+        "options_en": [
+          "Nothing",
+          "Rotate the session and re-authenticate",
+          "Clear all cookies",
+          "Extend validity"
+        ],
+        "explain_en": "Privilege changes require re-establishing the session."
+      }
+    ]
+  },
+  {
+    "id": "cwe-434-x",
+    "kind": "cwe",
+    "category": "文件与上传",
+    "cwe": "CWE-29",
+    "title": "压缩包路径穿越",
+    "title_en": "Path Traversal in Archive Extraction",
+    "level": "intermediate",
+    "icon": "ZIP",
+    "color": "file",
+    "summary": "解压时不校验压缩包内的条目路径，攻击者构造 ../ 条目把文件写到任意位置（Zip Slip）。",
+    "summary_en": "Extracting archives without validating entry paths allows writing files anywhere (Zip Slip).",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "ZIP、TAR 等格式允许条目名包含任意路径，包括绝对路径与 ../ 序列。解压库若直接把条目名拼到目标目录后写入，就会在目标目录之外创建或覆盖文件。攻击者可借此覆盖配置文件、写入 WebShell 或覆盖计划任务。",
+        "h_en": "Principle",
+        "p_en": "ZIP and TAR formats allow entry names with arbitrary paths, including absolute paths and ../ sequences. If a library concatenates the entry name onto the target directory, files are created or overwritten outside. An attacker can overwrite configs, drop webshells, or replace scheduled tasks."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "认为「压缩包是我自己的」不需要校验；上传与解压在同一流程里，上传者即为攻击者；不同语言的解压库默认行为不一致，有的会剥离 ../，有的不会。",
+        "h_en": "Why it happens",
+        "p_en": "Assuming an archive is your own needs no validation; upload and extraction in one flow where the uploader is the attacker; default behaviors differ across languages, some stripping ../ and some not."
+      },
+      {
+        "h": "如何发现",
+        "p": "构造一个含 ../../evil.txt 条目的压缩包上传，观察解压后文件是否出现在上层目录。也要测试绝对路径条目与符号链接条目。",
+        "h_en": "How to find it",
+        "p_en": "Upload an archive containing a ../../evil.txt entry and check whether the file appears above the target directory. Also test absolute path and symlink entries."
+      },
+      {
+        "h": "解决办法",
+        "p": "解压前逐条校验：把目标路径解析成绝对路径，确认仍在允许目录内，且不含符号链接跳转。更稳妥的做法是不按条目名落盘，而是由程序生成新文件名。限制解压后总大小与条目数量以防压缩炸弹。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "校验条目路径",
+            "bad": "for m in zf.namelist():\n    zf.extract(m, dest)",
+            "good": "base = Path(dest).resolve()\nfor m in zf.namelist():\n    target = (base / m).resolve()\n    if not target.is_relative_to(base):\n        raise ValueError(f\"invalid entry: {m}\")\n    if target.stat().st_size > LIMIT: ...",
+            "note": "resolve 后再判断归属，不做字符串匹配",
+            "title_en": "Validating the entry path",
+            "note_en": "Decide ownership after resolve, not by string matching"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Validate each entry before extraction: resolve the target to an absolute path, confirm it stays inside the allowed directory, and reject symlink hops. Safer still: do not write by entry name at all; generate new filenames. Cap total decompressed size and entry count to prevent zip bombs."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-29",
+        "url": "https://cwe.mitre.org/data/definitions/29.html"
+      },
+      {
+        "name": "Snyk Zip Slip",
+        "url": "https://security.snyk.io/research/zip-slip-vulnerability"
+      }
+    ],
+    "tags": [
+      "文件",
+      "上传"
+    ],
+    "quiz": [
+      {
+        "q": "Zip Slip 利用的是什么？",
+        "options": [
+          "压缩算法漏洞",
+          "压缩包条目名中的 ../ 导致越界写入",
+          "压缩比例过大",
+          "密码错误"
+        ],
+        "answer": 1,
+        "explain": "本质是 CWE-22 在解压场景的变体。",
+        "q_en": "What does Zip Slip exploit?",
+        "options_en": [
+          "Compression algorithm flaws",
+          "../ inside archive entry names causing out-of-bounds writes",
+          "Extreme compression ratio",
+          "Wrong password"
+        ],
+        "explain_en": "It is CWE-22 expressed in the extraction flow."
+      },
+      {
+        "q": "解压时校验路径的正确顺序是？",
+        "options": [
+          "字符串匹配 ../",
+          "解析成绝对路径后再判断是否在目标目录内",
+          "检查文件扩展名",
+          "检查文件大小"
+        ],
+        "answer": 1,
+        "explain": "字符串匹配会被各种变形绕过。",
+        "q_en": "Correct order for validating paths during extraction?",
+        "options_en": [
+          "String-match ../",
+          "Resolve to an absolute path, then verify containment in the target directory",
+          "Check file extension",
+          "Check file size"
+        ],
+        "explain_en": "String matching is bypassed by many variants."
+      },
+      {
+        "q": "解压还应限制什么以防拒绝服务？",
+        "options": [
+          "文件名长度",
+          "解压后总大小与条目数量",
+          "压缩级别",
+          "字符集"
+        ],
+        "answer": 1,
+        "explain": "压缩炸弹通过极端压缩比耗尽磁盘。",
+        "q_en": "What else should extraction limit to prevent denial of service?",
+        "options_en": [
+          "Filename length",
+          "Total decompressed size and entry count",
+          "Compression level",
+          "Charset"
+        ],
+        "explain_en": "Zip bombs exhaust disk through extreme ratios."
+      }
+    ]
+  },
+  {
+    "id": "cwe-538",
+    "kind": "cwe",
+    "category": "信息暴露",
+    "cwe": "CWE-538",
+    "title": "敏感文件可被下载",
+    "title_en": "File and Directory Information Exposure",
+    "level": "beginner",
+    "icon": "DIR",
+    "color": "leak",
+    "summary": "版本库目录、备份文件、配置文件被直接暴露在 Web 根目录下，攻击者下载即可拿到源码与密钥。",
+    "summary_en": "VCS directories, backups, and config files served directly from the web root.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "Web 服务器默认把根目录下的所有文件当作静态资源提供。如果部署时把 .git、.svn、.env、备份包、编辑器临时文件带上了服务器，任何知道路径的人都能直接下载。.git 还原源码几乎是脚本化的，一次扫描即可批量命中。",
+        "h_en": "Principle",
+        "p_en": "Web servers serve every file under the root by default. If .git, .svn, .env, backup archives, or editor temp files ship to the server, anyone knowing the path can download them. Restoring source from .git is nearly scripted, and one scan hits at scale."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "用 git 直接部署到 Web 目录；打包脚本把整个工作目录压缩上传；编辑器生成的 .swp、.bak 未清理；Nginx 配置里 location 规则遗漏了隐藏文件。",
+        "h_en": "Why it happens",
+        "p_en": "Deploying by git directly into the web directory; upload scripts archiving the whole working tree; unremoved .swp and .bak files; nginx location rules missing dotfiles."
+      },
+      {
+        "h": "如何发现",
+        "p": "请求 /.git/config、/.svn/entries、/.env、/config.php.bak、/backup.zip、/.DS_Store。检查 Web 根目录的实际文件列表与部署包内容。",
+        "h_en": "How to find it",
+        "p_en": "Request /.git/config, /.svn/entries, /.env, /config.php.bak, /backup.zip, /.DS_Store. Inspect the actual file list under the web root and the deployed package."
+      },
+      {
+        "h": "解决办法",
+        "p": "部署产物只含运行时必需文件，构建与部署分离。Web 服务器显式拒绝点开头的路径与备份类扩展名。凭据一律走环境变量，不落盘到 Web 目录。定期扫描线上根目录的暴露文件。",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "Nginx 拒绝隐藏文件",
+            "bad": "# No static file filtering, so .git is downloadable",
+            "good": "location ~ /\\. { deny all; }\nlocation ~* \\.(bak|old|swp|sql|zip|tar\\.gz)$ { deny all; }",
+            "note": "两道规则覆盖隐藏目录与备份扩展名",
+            "title_en": "Nginx denying hidden files",
+            "note_en": "Two rules cover hidden directories and backup extensions"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Deploy only runtime-required files, separating build and deploy. Explicitly deny dot-prefixed paths and backup extensions at the web server. Keep credentials in environment variables, never on disk under the web root. Periodically scan the live root for exposure."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-538",
+        "url": "https://cwe.mitre.org/data/definitions/538.html"
+      }
+    ],
+    "tags": [
+      "信息泄露",
+      "配置"
+    ],
+    "quiz": [
+      {
+        "q": "为什么 .git 目录暴露特别危险？",
+        "options": [
+          "占用空间",
+          "可还原完整源码，包含历史密钥与内部逻辑",
+          "影响速度",
+          "没有风险"
+        ],
+        "answer": 1,
+        "explain": "源码泄露直接暴露实现细节与历史凭据。",
+        "q_en": "Why is exposed .git especially dangerous?",
+        "options_en": [
+          "Disk usage",
+          "Full source can be reconstructed, including historical secrets and internal logic",
+          "Slower page loads",
+          "No risk"
+        ],
+        "explain_en": "Source disclosure exposes implementation details and past credentials."
+      },
+      {
+        "q": "下面哪项属于部署时应排除的内容？",
+        "options": [
+          "index.html",
+          "备份文件与版本库目录",
+          "静态图片",
+          "robots.txt"
+        ],
+        "answer": 1,
+        "explain": "只保留运行时必需的文件。",
+        "q_en": "Which should be excluded from deployment?",
+        "options_en": [
+          "index.html",
+          "Backup files and version control directories",
+          "Static images",
+          "robots.txt"
+        ],
+        "explain_en": "Deploy only runtime-required files."
+      },
+      {
+        "q": "防止此类暴露最根本的做法是？",
+        "options": [
+          "靠扫描工具定期查",
+          "构建产物与开发目录分离，只部署必需文件",
+          "改名隐藏",
+          "加登录"
+        ],
+        "answer": 1,
+        "explain": "从源头不部署，比事后拦截可靠。",
+        "q_en": "Most fundamental way to prevent this exposure?",
+        "options_en": [
+          "Periodic scanning",
+          "Separate build artifacts from the dev tree and deploy only required files",
+          "Rename to hide",
+          "Add authentication"
+        ],
+        "explain_en": "Not deploying it beats intercepting it later."
+      }
+    ]
+  },
+  {
+    "id": "cwe-915",
+    "kind": "cwe",
+    "category": "输入校验",
+    "cwe": "CWE-915",
+    "title": "批量赋值越权",
+    "title_en": "Mass Assignment",
+    "level": "intermediate",
+    "icon": "MASG",
+    "color": "input",
+    "summary": "框架把请求体字段自动映射到对象属性，攻击者多传一个 role 字段就能把自己变成管理员。",
+    "summary_en": "Auto-binding request fields to model attributes lets attackers set privileged properties.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "许多框架支持「请求体直接反序列化为对象」。如果对象包含敏感属性（角色、余额、是否审核通过、租户 ID），而代码没有限定可写字段，攻击者只要在 JSON 里多加一个键，就能改写这些属性。这是水平与垂直越权的常见来源。",
+        "h_en": "Principle",
+        "p_en": "Many frameworks deserialize request bodies straight into objects. If the object has sensitive attributes (role, balance, approval status, tenant ID) and code does not restrict writable fields, an attacker adds one key in JSON to change them. This is a common source of horizontal and vertical escalation."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为了少写代码，直接把 DTO 与实体合并；框架默认允许全部字段绑定；前端表单没展示的字段就被默认可写；更新接口用「有则更新」的通用逻辑。",
+        "h_en": "Why it happens",
+        "p_en": "Merging DTOs and entities to save code; framework default allowing all-field binding; fields not shown in the frontend form treated as writable; a generic update endpoint applying whichever fields are present."
+      },
+      {
+        "h": "如何发现",
+        "p": "在已知的更新接口里额外提交 role=admin、is_admin=true、balance=999999、tenant_id=他人，然后重新拉取对象观察是否生效。对每个写接口都试一次。",
+        "h_en": "How to find it",
+        "p_en": "Submit extra role=admin, is_admin=true, balance=999999, or tenant_id of another party to known update endpoints, then re-fetch the object to see whether it took effect. Try every write endpoint once."
+      },
+      {
+        "h": "解决办法",
+        "p": "使用显式的 DTO，只包含允许修改的字段，服务端做字段白名单映射。绝不把请求体直接绑定到实体。敏感属性只允许通过独立的、带额外校验的接口变更。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "DTO 白名单",
+            "bad": "@PostMapping(\"/user\")\npublic User update(@RequestBody User u) { return repo.save(u); }",
+            "good": "// Wrong: the body binds straight to the entity, so any field can be rewritten\n@PostMapping(\"/user\")\npublic User updateUnsafe(@RequestBody User u) {\n    return userRepo.save(u);\n}\n\n// Correct: a DTO containing only permitted fields\n@PostMapping(\"/user/safe\")\npublic User updateSafe(@RequestBody UpdateProfileDTO d) {\n    User u = userRepo.findById(d.getId()).orElseThrow();\n    u.setNickname(d.getNickname());\n    return userRepo.save(u);\n}",
+            "note": "请求体类型本身就是白名单（Spring 片段）",
+            "title_en": "DTO allowlist",
+            "note_en": "The body type itself is the allowlist (Spring excerpt)"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use explicit DTOs containing only allowed fields with server-side whitelist mapping. Never bind request bodies to entities directly. Allow sensitive attributes to change only through separate endpoints with extra verification."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-915",
+        "url": "https://cwe.mitre.org/data/definitions/915.html"
+      },
+      {
+        "name": "OWASP Mass Assignment",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "越权",
+      "框架"
+    ],
+    "quiz": [
+      {
+        "q": "批量赋值的本质是？",
+        "options": [
+          "性能问题",
+          "请求字段被自动映射到未授权的对象属性",
+          "字符集问题",
+          "缓存问题"
+        ],
+        "answer": 1,
+        "explain": "控制住了「哪些属性可写」，问题就消失。",
+        "q_en": "What is mass assignment essentially?",
+        "options_en": [
+          "Performance problem",
+          "Request fields auto-mapped onto un-authorized object attributes",
+          "Charset issue",
+          "Caching issue"
+        ],
+        "explain_en": "Control which attributes are writable and the problem disappears."
+      },
+      {
+        "q": "防御批量赋值最直接的做法是？",
+        "options": [
+          "过滤 role 字段",
+          "使用只含允许字段的 DTO",
+          "加密请求体",
+          "限制请求大小"
+        ],
+        "answer": 1,
+        "explain": "白名单比黑名单可靠。",
+        "q_en": "Most direct defense against mass assignment?",
+        "options_en": [
+          "Filter the role field",
+          "Use a DTO containing only allowed fields",
+          "Encrypt the body",
+          "Limit request size"
+        ],
+        "explain_en": "Whitelists are reliable; blacklists leak."
+      },
+      {
+        "q": "下面哪个字段最值得额外提交测试？",
+        "options": [
+          "title",
+          "role / is_admin / balance",
+          "description",
+          "created_at"
+        ],
+        "answer": 1,
+        "explain": "权限与金额类字段是攻击者首选目标。",
+        "q_en": "Which field most deserves extra submission testing?",
+        "options_en": [
+          "title",
+          "role / is_admin / balance",
+          "description",
+          "created_at"
+        ],
+        "explain_en": "Privilege and money fields are attackers' first targets."
+      }
+    ]
+  },
+  {
+    "id": "cwe-117",
+    "kind": "cwe",
+    "category": "信息暴露",
+    "cwe": "CWE-117",
+    "title": "日志注入",
+    "title_en": "Improper Output Neutralization for Logs",
+    "level": "beginner",
+    "icon": "LOG",
+    "color": "leak",
+    "summary": "用户输入未经处理写入日志，攻击者可伪造日志行、注入伪事件、甚至利用日志解析器执行代码。",
+    "summary_en": "Unsanitized input in logs allows forging log entries and injecting fake events.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "日志以行为单位，靠换行符分隔。如果用户输入里含 \\n，就能在日志中插入伪造的行。攻击者可以伪造「登录成功」「管理员操作」等记录混淆审计，也可以污染日后被脚本解析的日志格式。某些场景下（如日志被终端直接输出）还可能触发终端转义序列注入。",
+        "h_en": "Principle",
+        "p_en": "Logs are line-oriented and separated by newlines. If user input contains \\n, forged lines can be inserted. Attackers can fake successful logins or admin actions to confuse audits, or corrupt formats later parsed by scripts. In some cases terminal escape sequences can even be injected."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "直接把请求参数拼进日志字符串；认为日志只在内部可见；日志聚合系统按行解析，格式被污染后统计失真；运维用原始日志排查时被误导。",
+        "h_en": "Why it happens",
+        "p_en": "Request parameters concatenated straight into log strings; assuming logs are only internal; aggregation systems parsing by line so corrupted format skews statistics; operators misled during troubleshooting."
+      },
+      {
+        "h": "如何发现",
+        "p": "在会被记录到日志的参数里提交 %0a 或实际换行加一段伪造文本，然后查看日志文件是否出现额外的行。检查是否有转义序列被终端执行。",
+        "h_en": "How to find it",
+        "p_en": "Submit %0a or an actual newline plus forged text to a logged parameter, then check whether extra lines appear in the log. Check whether escape sequences get executed by a terminal."
+      },
+      {
+        "h": "解决办法",
+        "p": "写入日志前对用户可控部分做换行与转义字符的清理，或使用结构化日志（JSON 字段），让内容始终作为值而不是行文本。日志查看器避免直接渲染控制字符。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "清除非打印字符",
+            "bad": "logger.info(\"user=%s\" % username)",
+            "good": "def safe(s):\n    return s.replace(\"\\r\", \"\").replace(\"\\n\", \"\")[:200]\nlogger.info(\"user=%s\", safe(username))",
+            "note": "先去换行再截断，两步都要做",
+            "title_en": "Strip non-printable characters",
+            "note_en": "Strip newlines first, then truncate — both steps are required"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Strip newlines and escape characters from user-controlled parts before logging, or use structured logging (JSON fields) so content is always a value. Viewers should avoid rendering control characters directly."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-117",
+        "url": "https://cwe.mitre.org/data/definitions/117.html"
+      }
+    ],
+    "tags": [
+      "日志",
+      "审计"
+    ],
+    "quiz": [
+      {
+        "q": "日志注入的主要危害是？",
+        "options": [
+          "磁盘占满",
+          "伪造或混淆审计记录",
+          "提升 CPU",
+          "影响网络"
+        ],
+        "answer": 1,
+        "explain": "审计可信度被破坏，事后溯源失效。",
+        "q_en": "Main harm of log injection?",
+        "options_en": [
+          "Disk exhaustion",
+          "Forged or obfuscated audit records",
+          "CPU load",
+          "Network impact"
+        ],
+        "explain_en": "Audit credibility breaks, defeating later forensics."
+      },
+      {
+        "q": "最彻底的防御是？",
+        "options": [
+          "限制长度",
+          "使用结构化日志，内容只作为字段值",
+          "只在生产环境启用",
+          "关闭日志"
+        ],
+        "answer": 1,
+        "explain": "字段值不参与行格式，换行失去意义。",
+        "q_en": "Most thorough defense?",
+        "options_en": [
+          "Limit length",
+          "Structured logging where content is only a field value",
+          "Enable only in production",
+          "Disable logging"
+        ],
+        "explain_en": "Field values do not participate in line format, so newlines lose meaning."
+      },
+      {
+        "q": "清理日志输入时应该？",
+        "options": [
+          "只处理换行符",
+          "同时处理回车与换行并截断长度",
+          "只截断",
+          "转成大写"
+        ],
+        "answer": 1,
+        "explain": "回车也能被部分解析器当作行尾。",
+        "q_en": "When sanitizing log input you should?",
+        "options_en": [
+          "Handle only newline",
+          "Handle both carriage return and newline, and truncate length",
+          "Only truncate",
+          "Uppercase it"
+        ],
+        "explain_en": "Carriage return can also terminate lines for some parsers."
+      }
+    ]
+  },
+  {
+    "id": "cwe-613",
+    "kind": "cwe",
+    "category": "认证与会话",
+    "cwe": "CWE-613",
+    "title": "会话过期不当",
+    "title_en": "Insufficient Session Expiration",
+    "level": "beginner",
+    "icon": "EXPIRE",
+    "color": "auth",
+    "summary": "会话或令牌长期有效甚至永不过期，一旦泄露攻击者可以长期持有一段有效身份。",
+    "summary_en": "Sessions or tokens stay valid too long, extending the impact of any leak.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "会话是「临时」的身份凭证，理应随时间与空闲自动失效。如果令牌长期有效，泄露的后果就从「短暂窗口」变成「持续控制」。移动端与 API 场景中「永久 access token」是很常见的实现缺陷。",
+        "h_en": "Principle",
+        "p_en": "A session is a temporary identity credential and should expire with time and idleness. If tokens live too long, a leak turns from a brief window into sustained control. Permanent access tokens are a common implementation flaw in mobile and API contexts."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为避免用户频繁登录而设置极长有效期；「记住我」的实现把有效期设成数年；JWT 的 exp 被设置得非常远甚至省略；注销只清了前端存储，服务端令牌仍然有效。",
+        "h_en": "Why it happens",
+        "p_en": "Very long validity to avoid frequent logins; remember-me set to years; JWT exp set far in the future or omitted; logout clearing only frontend storage while the server token remains valid."
+      },
+      {
+        "h": "如何发现",
+        "p": "检查 Cookie 与令牌的过期时间；注销后重放旧令牌，观察是否仍被接受；空闲一段时间后再请求，观察是否仍有效。",
+        "h_en": "How to find it",
+        "p_en": "Inspect cookie and token expiry; replay an old token after logout and see whether it is still accepted; wait idle then request again."
+      },
+      {
+        "h": "解决办法",
+        "p": "设置合理的绝对有效期与空闲超时。采用短期 access token 加长期 refresh token 的组合，refresh token 支持吊销。注销时在服务端使会话失效，而不只是删除前端存储。",
+        "code": [
+          {
+            "lang": "text",
+            "title": "令牌策略",
+            "bad": "exp: 10 years out  // or omit exp, which never expires",
+            "good": "access_token: 15 minutes, exp required\nrefresh_token: 14 days, revocable, single-use, device-bound",
+            "note": "短期凭证 + 可吊销的刷新链",
+            "title_en": "Token policy",
+            "note_en": "Short-lived credentials plus a revocable refresh chain"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Set reasonable absolute and idle timeouts. Combine short-lived access tokens with long-lived refresh tokens, and make refresh tokens revocable. Invalidate sessions server-side on logout, not just client storage."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-613",
+        "url": "https://cwe.mitre.org/data/definitions/613.html"
+      }
+    ],
+    "tags": [
+      "会话",
+      "令牌"
+    ],
+    "quiz": [
+      {
+        "q": "短期 access token 加 refresh token 的好处是？",
+        "options": [
+          "减少代码",
+          "泄露窗口小，且可集中吊销刷新链",
+          "节省带宽",
+          "兼容性更好"
+        ],
+        "answer": 1,
+        "explain": "缩短暴露面并保留可控的续期能力。",
+        "q_en": "Benefit of short-lived access tokens plus refresh tokens?",
+        "options_en": [
+          "Less code",
+          "Small exposure window with a revocable refresh chain",
+          "Saves bandwidth",
+          "Better compatibility"
+        ],
+        "explain_en": "Shrinks exposure while keeping controlled renewal."
+      },
+      {
+        "q": "注销时只清前端存储的问题？",
+        "options": [
+          "没有影响",
+          "服务端令牌仍有效，可被重放",
+          "影响性能",
+          "会导致报错"
+        ],
+        "answer": 1,
+        "explain": "吊销必须发生在服务端。",
+        "q_en": "Problem with clearing only frontend storage on logout?",
+        "options_en": [
+          "No impact",
+          "The server token stays valid and can be replayed",
+          "Performance",
+          "Causes errors"
+        ],
+        "explain_en": "Revocation must happen server-side."
+      },
+      {
+        "q": "令牌省略 exp 字段意味着？",
+        "options": [
+          "更安全",
+          "永不过期，泄露即长期有效",
+          "自动续期",
+          "兼容性更好"
+        ],
+        "answer": 1,
+        "explain": "过期是令牌的基本属性。",
+        "q_en": "Omitting exp on a token means?",
+        "options_en": [
+          "Safer",
+          "It never expires, so a leak is valid indefinitely",
+          "Auto-renew",
+          "Better compatibility"
+        ],
+        "explain_en": "Expiry is a basic token property."
+      }
+    ]
+  },
+  {
+    "id": "cwe-321",
+    "kind": "cwe",
+    "category": "密码学",
+    "cwe": "CWE-321",
+    "title": "硬编码加密密钥",
+    "title_en": "Use of Hard-coded Cryptographic Key",
+    "level": "intermediate",
+    "icon": "HKEY",
+    "color": "crypto",
+    "summary": "加密密钥写死在代码或固件里，等于加密算法公开、密钥也公开，机密性完全失效。",
+    "summary_en": "A key baked into code or firmware is public the moment the artifact ships.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "对称加密的安全性完全依赖密钥保密。若密钥硬编码在客户端、固件或镜像里，攻击者只要能拿到程序就能提取密钥并解密全部数据。更糟的是所有用户共用同一密钥，一处泄露即全量泄露。",
+        "h_en": "Principle",
+        "p_en": "Symmetric encryption security depends entirely on key secrecy. If a key is hard-coded in a client, firmware, or image, anyone who can obtain the program can extract the key and decrypt everything. Worse, all users share one key, so a single leak compromises everything."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为简化部署把密钥写进配置文件一起发布；固件里用固定密钥加密通信；认为「代码编译成二进制就安全」；加密仅用于防止用户直接查看，而非真正的威胁模型。",
+        "h_en": "Why it happens",
+        "p_en": "Writing keys into config files shipped with the app for simplicity; fixed keys in firmware for communication; assuming compiling to binary makes it safe; encryption used only to prevent casual viewing rather than against a real threat model."
+      },
+      {
+        "h": "如何发现",
+        "p": "对二进制与镜像做字符串搜索，找 base64 或十六进制的长串；检查固件文件系统中的配置文件；查找加密算法调用附近的常量。",
+        "h_en": "How to find it",
+        "p_en": "Run string search for long base64 or hex strings on binaries and images; inspect config files in firmware filesystems; look for constants near crypto API calls."
+      },
+      {
+        "h": "解决办法",
+        "p": "密钥由外部注入（密钥管理服务、系统密钥库、用户口令派生）。设备类产品采用一机一密并在产线注入。传输场景改用非对称协商，避免共享静态密钥。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "密钥来源",
+            "bad": "byte[] key = \"0123456789abcdef\".getBytes();",
+            "good": "KeyStore ks = KeyStore.getInstance(\"Windows-MY\");\nKey key = ks.getKey(alias, null);",
+            "note": "系统密钥库托管密钥，程序只持有引用",
+            "title_en": "Key source",
+            "note_en": "The OS keystore holds the key; the program keeps only a reference"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Inject keys externally (key management service, OS key store, derivation from a user passphrase). Provision devices with per-device secrets during manufacturing. Use asymmetric negotiation for transport rather than shared static keys."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-321",
+        "url": "https://cwe.mitre.org/data/definitions/321.html"
+      }
+    ],
+    "tags": [
+      "密码学",
+      "凭据"
+    ],
+    "quiz": [
+      {
+        "q": "对称加密的安全性取决于？",
+        "options": [
+          "算法保密",
+          "密钥保密",
+          "数据长度",
+          "传输协议"
+        ],
+        "answer": 1,
+        "explain": "算法公开、密钥必须保密。",
+        "q_en": "Symmetric encryption security depends on?",
+        "options_en": [
+          "Algorithm secrecy",
+          "Key secrecy",
+          "Data length",
+          "Transport protocol"
+        ],
+        "explain_en": "Algorithms are public; keys must stay secret."
+      },
+      {
+        "q": "固件里所有设备共用一个密钥的风险是？",
+        "options": [
+          "性能差",
+          "一处泄露等于全部设备失守",
+          "兼容性问题",
+          "无法升级"
+        ],
+        "answer": 1,
+        "explain": "一机一密可以把泄露范围限制在单台设备。",
+        "q_en": "Risk of one shared key across all firmware devices?",
+        "options_en": [
+          "Poor performance",
+          "One leak compromises every device",
+          "Compatibility issues",
+          "Cannot upgrade"
+        ],
+        "explain_en": "Per-device keys bound the blast radius to one device."
+      },
+      {
+        "q": "「编译成二进制就安全」这个判断？",
+        "options": [
+          "正确",
+          "错误，二进制可被反编译与字符串搜索",
+          "取决于语言",
+          "取决于平台"
+        ],
+        "answer": 1,
+        "explain": "客户端代码没有秘密可言。",
+        "q_en": "Is compiling to a binary safe enough?",
+        "options_en": [
+          "Yes",
+          "No, binaries can be decompiled and string-searched",
+          "Depends on language",
+          "Depends on platform"
+        ],
+        "explain_en": "Client-side code holds no secrets."
+      }
+    ]
+  },
+  {
+    "id": "cwe-311",
+    "kind": "cwe",
+    "category": "密码学",
+    "cwe": "CWE-311",
+    "title": "敏感数据未加密存储",
+    "title_en": "Missing Encryption of Sensitive Data",
+    "level": "beginner",
+    "icon": "PLAIN",
+    "color": "crypto",
+    "summary": "口令、身份证号、银行卡等敏感数据以明文或弱哈希形式落盘，一旦数据库泄露即全量暴露。",
+    "summary_en": "Sensitive data stored in plaintext or weak hashes are fully exposed on any DB leak.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "存储层是数据保护的最后一道关口。如果敏感字段以明文保存，或只做了可逆编码（Base64）、弱哈希（MD5 无盐），那么数据库泄露、备份泄露、SQL 注入都可能直接拿到可用凭据。口令还涉及撞库扩散效应——用户往往跨站复用。",
+        "h_en": "Principle",
+        "p_en": "Storage is the last line of data protection. If sensitive fields are stored in plaintext, or only reversibly encoded (Base64) or weakly hashed (unsalted MD5), a database leak, backup leak, or SQL injection yields usable credentials directly. Passwords also amplify via cross-site reuse."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为了支持「找回密码」而保存明文；为方便排查问题把完整卡号写进日志；历史系统遗留；认为数据库在内网就安全。",
+        "h_en": "Why it happens",
+        "p_en": "Storing plaintext to support password recovery; writing full card numbers into logs for troubleshooting; legacy systems; assuming the database is internal and therefore safe."
+      },
+      {
+        "h": "如何发现",
+        "p": "抽查数据库中口令、证件号、卡号字段的实际内容；检查备份文件与导出接口；确认是否存在可逆编码冒充加密。",
+        "h_en": "How to find it",
+        "p_en": "Sample the actual contents of password, ID number, and card number fields; inspect backups and export endpoints; confirm there is no reversible encoding masquerading as encryption."
+      },
+      {
+        "h": "解决办法",
+        "p": "口令用慢哈希（bcrypt/scrypt/Argon2）加盐存储，永不存明文。需要可读的敏感字段用对称加密并托管密钥。不需要完整值的字段做掩码或令牌化。日志与导出全程脱敏。",
+        "code": [
+          {
+            "lang": "sql",
+            "title": "字段设计",
+            "bad": "-- password VARCHAR(64) stores plaintext or MD5",
+            "good": "-- password_hash VARCHAR(255) stores the bcrypt result\n-- card_no_masked VARCHAR(20) stores only the mask\n-- card_no_token VARCHAR(64) stores a tokenized reference",
+            "note": "按用途选择哈希、加密或令牌化",
+            "title_en": "Field design",
+            "note_en": "Choose hashing, encryption or tokenization by purpose"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Store passwords with salted slow hashes (bcrypt, scrypt, Argon2), never plaintext. Encrypt sensitive fields that must be readable and manage keys properly. Mask or tokenize fields not needing full values. Redact throughout logs and exports."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-311",
+        "url": "https://cwe.mitre.org/data/definitions/311.html"
+      },
+      {
+        "name": "OWASP Cryptographic Storage",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "密码学",
+      "存储"
+    ],
+    "quiz": [
+      {
+        "q": "Base64 编码是否等同于加密？",
+        "options": [
+          "是",
+          "否，它是可逆编码，不提供任何保密性",
+          "取决于语言",
+          "取决于长度"
+        ],
+        "answer": 1,
+        "explain": "编码不是加密。",
+        "q_en": "Is Base64 encoding equivalent to encryption?",
+        "options_en": [
+          "Yes",
+          "No, it is reversible encoding offering no confidentiality",
+          "Depends on language",
+          "Depends on length"
+        ],
+        "explain_en": "Encoding is not encryption."
+      },
+      {
+        "q": "口令为什么不能用 MD5 存储？",
+        "options": [
+          "体积太大",
+          "无盐且速度太快，彩虹表与暴力破解成本极低",
+          "不支持中文",
+          "兼容性问题"
+        ],
+        "answer": 1,
+        "explain": "慢哈希加盐才能提高破解成本。",
+        "q_en": "Why not store passwords with MD5?",
+        "options_en": [
+          "Too large",
+          "Unsalted and too fast, making rainbow tables and brute force cheap",
+          "No Unicode support",
+          "Compatibility issues"
+        ],
+        "explain_en": "Slow salted hashing raises cracking cost."
+      },
+      {
+        "q": "需要「可读回」的敏感字段应该？",
+        "options": [
+          "存明文",
+          "用对称加密并妥善托管密钥",
+          "用 MD5",
+          "用 Base64"
+        ],
+        "answer": 1,
+        "explain": "可逆需求用加密，不可逆需求用哈希。",
+        "q_en": "Sensitive fields that must be read back should be?",
+        "options_en": [
+          "Stored plaintext",
+          "Symmetrically encrypted with properly managed keys",
+          "Hashed with MD5",
+          "Base64 encoded"
+        ],
+        "explain_en": "Reversible needs use encryption; irreversible needs hashing."
+      }
+    ]
+  },
+  {
+    "id": "cwe-522",
+    "kind": "cwe",
+    "category": "认证与会话",
+    "cwe": "CWE-522",
+    "title": "凭据保护不足",
+    "title_en": "Insufficiently Protected Credentials",
+    "level": "intermediate",
+    "icon": "CRED",
+    "color": "auth",
+    "summary": "凭据在传输或存储过程中缺乏保护，例如经 HTTP 明文传输、写进 URL、或存于可读的本地文件。",
+    "summary_en": "Credentials transmitted or stored without adequate protection.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "凭据一旦在链路上以明文出现，任何能观察链路的一方（同网段、代理、日志系统）都能拿到。常见位置包括：非 HTTPS 登录接口、把 token 放在 URL 查询串（会进入浏览器历史与服务器日志）、把凭据写入本地明文配置文件。",
+        "h_en": "Principle",
+        "p_en": "Once credentials appear in cleartext on the wire, anyone observing the path (same network segment, proxy, logging system) can capture them. Common locations include non-HTTPS login endpoints, tokens in URL query strings (which enter browser history and server logs), and cleartext local config files."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "内网环境图省事用 HTTP；为了方便分享把 token 拼在链接里；客户端把凭据存在不加密的配置文件；代理与网关把完整请求头写入日志。",
+        "h_en": "Why it happens",
+        "p_en": "Using HTTP for convenience on internal networks; embedding tokens in links to share them; storing credentials unencrypted on the client; proxies and gateways logging complete headers."
+      },
+      {
+        "h": "如何发现",
+        "p": "抓包观察登录请求是否走 HTTPS；检查 URL 中是否出现 token、password 等参数；检查本地存储与会话日志中是否有明文凭据。",
+        "h_en": "How to find it",
+        "p_en": "Capture login requests and check for HTTPS; look for token or password parameters in URLs; check local storage and session logs for plaintext credentials."
+      },
+      {
+        "h": "解决办法",
+        "p": "全站强制 HTTPS 并启用 HSTS。凭据只放在请求体或请求头，绝不放 URL。客户端使用系统密钥库或加密存储。网关与日志系统对凭据字段做脱敏。",
+        "code": [
+          {
+            "lang": "bash",
+            "title": "传输方式",
+            "bad": "curl \"http://api.example.com/login?password=123456\"",
+            "good": "curl -X POST https://api.example.com/login \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"password\":\"...\"}'",
+            "note": "HTTPS + 请求体，避免凭据进入 URL 与日志",
+            "title_en": "Transport",
+            "note_en": "HTTPS plus a request body keeps credentials out of URLs and logs"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Enforce HTTPS site-wide with HSTS. Put credentials only in request bodies or headers, never in URLs. Use OS key stores or encrypted storage on clients. Redact credential fields in gateways and logging."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-522",
+        "url": "https://cwe.mitre.org/data/definitions/522.html"
+      }
+    ],
+    "tags": [
+      "凭据",
+      "传输"
+    ],
+    "quiz": [
+      {
+        "q": "把 token 放在 URL 查询串的问题？",
+        "options": [
+          "长度限制",
+          "会进入浏览器历史、代理与服务器日志",
+          "不支持中文",
+          "无法缓存"
+        ],
+        "answer": 1,
+        "explain": "URL 会被大量中间环节记录。",
+        "q_en": "Problem with putting tokens in URL query strings?",
+        "options_en": [
+          "Length limits",
+          "They enter browser history, proxies, and server logs",
+          "No Unicode support",
+          "No caching"
+        ],
+        "explain_en": "URLs are recorded by many intermediaries."
+      },
+      {
+        "q": "内网环境是否可以不使用 HTTPS？",
+        "options": [
+          "可以",
+          "不可以，内网同样存在嗅探与横向移动风险",
+          "取决于带宽",
+          "取决于人数"
+        ],
+        "answer": 1,
+        "explain": "传输加密不因网络位置而可省略。",
+        "q_en": "Can internal networks skip HTTPS?",
+        "options_en": [
+          "Yes",
+          "No, sniffing and lateral movement exist internally too",
+          "Depends on bandwidth",
+          "Depends on headcount"
+        ],
+        "explain_en": "Transport encryption is not optional based on network location."
+      },
+      {
+        "q": "客户端保存凭据推荐方式是？",
+        "options": [
+          "明文配置文件",
+          "系统密钥库或加密存储",
+          "写进日志",
+          "存到 URL"
+        ],
+        "answer": 1,
+        "explain": "让操作系统托管密钥材料。",
+        "q_en": "Recommended client-side credential storage?",
+        "options_en": [
+          "Plaintext config file",
+          "OS key store or encrypted storage",
+          "Logs",
+          "URL"
+        ],
+        "explain_en": "Let the operating system hold key material."
+      }
+    ]
+  },
+  {
+    "id": "cwe-601-x",
+    "kind": "cwe",
+    "category": "Web 安全",
+    "cwe": "CWE-1021-x",
+    "title": "不安全的内嵌与跨源",
+    "title_en": "Cross-Origin Misconfiguration",
+    "level": "intermediate",
+    "icon": "CORS",
+    "color": "web",
+    "summary": "CORS 配置过宽或 postMessage 未校验来源，使其他站点能读取本应受限的数据或注入消息。",
+    "summary_en": "Overly permissive CORS or unvalidated postMessage lets other origins read or inject data.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "同源策略默认阻止跨站读取响应。CORS 是受控的例外：如果服务端返回 Access-Control-Allow-Origin: * 且允许携带凭据，或直接把请求的 Origin 原样回显，任何站点都能代用户读取接口数据。postMessage 同理，若不校验 event.origin，任意嵌入方都能注入消息。",
+        "h_en": "Principle",
+        "p_en": "The same-origin policy blocks reading cross-site responses by default. CORS is a controlled exception: if the server returns Access-Control-Allow-Origin: * and allows credentials, or echoes the request Origin, any site can read API data on the user's behalf. postMessage behaves similarly: without checking event.origin, any embedder can inject messages."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "为了让前端联调方便而放开全部来源；把 Origin 请求头直接回显到响应；大量使用 postMessage 但忘记判断来源；子域通配写法过宽。",
+        "h_en": "Why it happens",
+        "p_en": "Opening all origins for frontend integration; echoing the Origin header into the response; heavy postMessage use without origin checks; overly broad subdomain wildcards."
+      },
+      {
+        "h": "如何发现",
+        "p": "用另一个域发起请求，观察响应头中 ACAO 是否回显你的来源；检查是否同时设置 Allow-Credentials: true；审查 postMessage 监听器是否判断 origin。",
+        "h_en": "How to find it",
+        "p_en": "Issue a request from another domain and see whether ACAO echoes your origin; check whether Allow-Credentials is also true; review postMessage listeners for origin checks."
+      },
+      {
+        "h": "解决办法",
+        "p": "CORS 使用精确的来源白名单，避免通配符与 Origin 回显。需要凭据时绝不用 *。postMessage 必须校验 event.origin 并在发送时指定目标来源。",
+        "code": [
+          {
+            "lang": "javascript",
+            "title": "postMessage 校验来源",
+            "bad": "window.addEventListener('message', (e) => {\n  doSomething(e.data);\n});",
+            "good": "const ALLOWED = 'https://app.example.com';\nwindow.addEventListener('message', (e) => {\n  if (e.origin !== ALLOWED) return;\n  doSomething(e.data);\n});",
+            "note": "不判断来源等于允许任何嵌入方注入",
+            "title_en": "postMessage origin check",
+            "note_en": "Not checking the origin lets any embedder inject"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use precise origin whitelists for CORS, avoiding wildcards and Origin reflection. When credentials are needed, never use *. postMessage must validate event.origin and specify the target origin when sending."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MDN CORS",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS"
+      },
+      {
+        "name": "OWASP CORS",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html"
+      }
+    ],
+    "tags": [
+      "Web",
+      "跨源"
+    ],
+    "quiz": [
+      {
+        "q": "CORS 配置为回显任意 Origin 且允许凭据，后果是？",
+        "options": [
+          "性能下降",
+          "任意站点都能代用户读取接口数据",
+          "无法登录",
+          "兼容性问题"
+        ],
+        "answer": 1,
+        "explain": "等于绕过同源策略。",
+        "q_en": "CORS echoing any Origin while allowing credentials means?",
+        "options_en": [
+          "Slower performance",
+          "Any site can read API data on the user's behalf",
+          "Login breaks",
+          "Compatibility issues"
+        ],
+        "explain_en": "It effectively bypasses the same-origin policy."
+      },
+      {
+        "q": "postMessage 监听器最少要校验什么？",
+        "options": [
+          "消息长度",
+          "event.origin",
+          "msg.type",
+          "时间戳"
+        ],
+        "answer": 1,
+        "explain": "来源校验是唯一有效的边界。",
+        "q_en": "What must a postMessage listener at minimum validate?",
+        "options_en": [
+          "Message length",
+          "event.origin",
+          "msg.type",
+          "Timestamp"
+        ],
+        "explain_en": "Origin validation is the only real boundary."
+      },
+      {
+        "q": "需要携带凭据时，Allow-Origin 能否为通配符？",
+        "options": [
+          "可以",
+          "不可以，必须指定精确来源",
+          "取决于浏览器",
+          "取决于 HTTPS"
+        ],
+        "answer": 1,
+        "explain": "通配符与凭据不能共存。",
+        "q_en": "Can Allow-Origin be a wildcard when credentials are needed?",
+        "options_en": [
+          "Yes",
+          "No, an exact origin must be specified",
+          "Depends on browser",
+          "Depends on HTTPS"
+        ],
+        "explain_en": "Wildcards and credentials cannot coexist."
+      }
+    ]
+  },
+  {
+    "id": "cwe-327",
+    "kind": "cwe",
+    "category": "密码学",
+    "cwe": "CWE-327",
+    "title": "使用已破解的加密算法",
+    "title_en": "Use of a Broken or Risky Cryptographic Algorithm",
+    "level": "intermediate",
+    "icon": "WEAK",
+    "color": "crypto",
+    "summary": "仍在使用 MD5、SHA-1、DES、RC4 等已被破解的算法，或把哈希当加密用。",
+    "summary_en": "Using broken algorithms such as MD5, SHA-1, DES, or RC4.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "算法的安全性随时间衰减。MD5 与 SHA-1 已存在实用碰撞，DES 与 RC4 的密钥空间或密钥流存在已知弱点。把它们用于签名、口令、加密都会导致保护失效。此外，把哈希当加密（期望可逆）也是常见误用。",
+        "h_en": "Principle",
+        "p_en": "Algorithm strength decays over time. MD5 and SHA-1 have practical collisions, and DES and RC4 have known weaknesses in key space or keystream. Using them for signatures, passwords, or encryption breaks protection. Treating a hash as encryption (expecting reversibility) is another common misuse."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "历史代码沿用；教程示例过时；为兼容旧系统；不理解哈希与加密的区别；认为「加个哈希就算加密」。",
+        "h_en": "Why it happens",
+        "p_en": "Legacy code carried forward; outdated tutorial examples; compatibility with old systems; not understanding the difference between hashing and encryption; believing that hashing counts as encryption."
+      },
+      {
+        "h": "如何发现",
+        "p": "代码搜索 MD5、SHA1、DES、RC4、ECB 模式的使用；检查证书签名算法；查看依赖库的默认算法配置。",
+        "h_en": "How to find it",
+        "p_en": "Search code for MD5, SHA1, DES, RC4, and ECB mode; check certificate signature algorithms; review default algorithm configuration in dependencies."
+      },
+      {
+        "h": "解决办法",
+        "p": "对称加密用 AES-GCM 或 ChaCha20-Poly1305，避免 ECB 模式。口令用 bcrypt/Argon2。完整性校验用 SHA-256 及以上。需要可逆就用加密，不需要就只用哈希，别混用。",
+        "code": [
+          {
+            "lang": "java",
+            "title": "算法选择",
+            "bad": "Cipher c = Cipher.getInstance(\"DES/ECB/PKCS5Padding\");",
+            "good": "Cipher c = Cipher.getInstance(\"AES/GCM/NoPadding\");\n// Random 12-byte IV makes each encryption unique",
+            "note": "GCM 同时提供机密性与完整性",
+            "title_en": "Algorithm choice",
+            "note_en": "GCM provides both confidentiality and integrity"
+          }
+        ],
+        "h_en": "Fix",
+        "p_en": "Use AES-GCM or ChaCha20-Poly1305 for symmetric encryption, avoiding ECB. Use bcrypt or Argon2 for passwords. Use SHA-256 or stronger for integrity. Choose encryption for reversibility and hashing for none; do not mix them up."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-327",
+        "url": "https://cwe.mitre.org/data/definitions/327.html"
+      }
+    ],
+    "tags": [
+      "密码学"
+    ],
+    "quiz": [
+      {
+        "q": "ECB 模式的主要问题是？",
+        "options": [
+          "速度慢",
+          "相同明文块产生相同密文块，泄露结构信息",
+          "不支持中文",
+          "无法解密"
+        ],
+        "answer": 1,
+        "explain": "ECB 不隐藏数据模式。",
+        "q_en": "Main problem with ECB mode?",
+        "options_en": [
+          "Slow",
+          "Identical plaintext blocks produce identical ciphertext blocks, leaking structure",
+          "No Unicode",
+          "Cannot decrypt"
+        ],
+        "explain_en": "ECB does not hide data patterns."
+      },
+      {
+        "q": "完整性校验应使用？",
+        "options": [
+          "MD5",
+          "SHA-256 及以上",
+          "Base64",
+          "CRC32"
+        ],
+        "answer": 1,
+        "explain": "弱哈希存在碰撞风险。",
+        "q_en": "What should integrity checks use?",
+        "options_en": [
+          "MD5",
+          "SHA-256 or stronger",
+          "Base64",
+          "CRC32"
+        ],
+        "explain_en": "Weak hashes have collision risk."
+      },
+      {
+        "q": "哈希与加密的关键区别是？",
+        "options": [
+          "速度不同",
+          "哈希不可逆，加密可逆",
+          "长度不同",
+          "哈希更安全"
+        ],
+        "answer": 1,
+        "explain": "按是否需要还原选择。",
+        "q_en": "Key difference between hashing and encryption?",
+        "options_en": [
+          "Speed",
+          "Hashing is irreversible, encryption is reversible",
+          "Length",
+          "Hashing is safer"
+        ],
+        "explain_en": "Choose based on whether you need to restore the value."
+      }
+    ]
+  },
+  {
+    "id": "cwe-444",
+    "kind": "cwe",
+    "category": "协议与请求",
+    "cwe": "CWE-444",
+    "title": "HTTP 请求走私",
+    "title_en": "HTTP Request Smuggling",
+    "level": "advanced",
+    "icon": "444",
+    "color": "protocol",
+    "summary": "前端代理与后端服务器对「一个请求在哪里结束」理解不一致，攻击者把隐藏的第二个请求夹带进来，让它以后面受害者的身份被处理。",
+    "summary_en": "Front-end proxy and back-end server disagree on where one request ends, letting an attacker smuggle a hidden second request that gets processed with the next victim's identity.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "HTTP/1.1 有两种方式声明请求体长度：Content-Length 和 Transfer-Encoding: chunked。规范说两者同时出现时应以 chunked 为准，但链条上的每台服务器都要先读到头部才能做决定——如果前端看 CL、后端看 TE（或反过来），它们切出来的「请求边界」就不同。多出来的那一段字节会被后端当成下一个请求的开头，而下一个请求往往属于别的用户。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "HTTP/1.1 has two ways to declare body length: Content-Length and Transfer-Encoding: chunked. The spec says chunked wins when both appear, but every server in the chain must first decide which header to honor. If the front-end follows CL while the back-end follows TE (or vice versa), they slice the byte stream at different boundaries. The leftover bytes are then parsed as the beginning of the next request — which usually belongs to another user."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "现代架构里请求要穿过 CDN、WAF、负载均衡、反向代理、应用服务器，每一跳都是独立实现的 HTTP 解析器。各家对畸形报文的容忍度不同：重复 Content-Length 谁优先、TE 头写成 'Transfer-Encoding : chunked'（带空格）算不算、chunk 尺寸里的换行符怎么处理——任何一处分歧都是走私通道。HTTP/2 降级到 HTTP/1.1 时又引入了新一类（H2.CL / H2.TE）。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Modern stacks pass a request through CDN, WAF, load balancer, reverse proxy and app server — each an independent HTTP parser. They differ on malformed input: which duplicate Content-Length wins, whether 'Transfer-Encoding : chunked' with a space counts, how newlines inside chunk sizes are handled. Any divergence is a smuggling channel. HTTP/2 downgraded to HTTP/1.1 adds another class (H2.CL / H2.TE)."
+      },
+      {
+        "h": "最小复现",
+        "p": "经典 CL.TE：前端按 Content-Length 转发全部 13 字节，后端按 chunked 解析，0 后面的 'G' 被留在缓冲区，拼进下一个请求，使受害者发出 'GPOST'。下面的报文可原样发到存在该缺陷的靶场（如 PortSwigger lab）观察现象。",
+        "code": [
+          {
+            "lang": "http",
+            "title": "CL.TE 走私报文",
+            "bad": "POST / HTTP/1.1\r\nHost: target\r\nContent-Length: 13\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nG",
+            "good": "前端与后端必须使用同一份解析规则：\n- 同时出现 CL 与 TE 时，拒绝该请求（400），\n  而不是「选一个继续」；\n- 或全链路强制 HTTP/2 端到端，禁止降级。",
+            "note": "留在缓冲区的 G 会拼进下一位用户的请求",
+            "title_en": "CL.TE smuggling request",
+            "note_en": "The leftover G prefixes the next user's request"
+          }
+        ],
+        "h_en": "Minimal reproduction",
+        "p_en": "Classic CL.TE: the front-end forwards all 13 bytes per Content-Length, the back-end parses chunked, and the 'G' after the terminating 0 stays in the buffer, prefixing the next request so the victim sends 'GPOST'. This raw request can be replayed against a vulnerable lab (e.g. PortSwigger) to observe the effect."
+      },
+      {
+        "h": "真实影响",
+        "p": "走私的请求绕过了前端的所有安全控制——WAF 规则、路径级鉴权、速率限制都只检查「外层」那个合法请求。攻击者可以：缓存投毒（让走私响应被缓存给所有人）、劫持其他用户的会话请求（连同 Cookie 一起转发到自己控制的端点）、绕过 front-end 的 /admin 访问限制。2021 年后多家大厂漏洞赏金记录显示其赏金常年处于最高档。",
+        "code": [],
+        "h_en": "Real-world impact",
+        "p_en": "A smuggled request bypasses every front-end control — WAF rules, path-level auth, rate limiting all inspect only the outer, legitimate request. Attackers can poison shared caches, capture other users' requests including cookies, and reach /admin paths blocked at the front-end. Bug bounty records since 2021 keep this class in the highest payout tier."
+      },
+      {
+        "h": "解决办法",
+        "p": "一句话：消灭歧义。网关层对同时携带 CL 与 TE 的请求直接返回 400，绝不「帮忙选一个」；统一并固化每一跳的 HTTP 解析配置，升级组件时回归测试畸形报文；链路端到端使用 HTTP/2（其帧边界是二进制的，无文本歧义），禁止中间降级；对连接复用保持警惕——走私依赖后端把字节留给下一个请求，必要时装配「每连接一请求」的隔离策略。",
+        "code": [],
+        "h_en": "Mitigations",
+        "p_en": "In one sentence: eliminate ambiguity. Reject requests carrying both CL and TE with 400 at the gateway instead of picking one; pin and regression-test parser behavior at every hop; run HTTP/2 end to end (its binary framing has no textual ambiguity) and forbid downgrades; be wary of connection reuse — smuggling relies on the back-end leaving bytes for the next request, so isolate with one-request-per-connection where needed."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-444",
+        "url": "https://cwe.mitre.org/data/definitions/444.html"
+      },
+      {
+        "name": "PortSwigger Research: HTTP Desync Attacks",
+        "url": "https://portswigger.net/research/http-desync-attacks-request-smuggling-reborn"
+      }
+    ],
+    "tags": [
+      "HTTP",
+      "代理",
+      "协议",
+      "Web"
+    ],
+    "quiz": [
+      {
+        "q": "CL.TE 走私成立的前提是什么？",
+        "options": [
+          "前端与后端对请求边界判定不一致",
+          "服务器没开 HTTPS",
+          "请求头里有中文",
+          "后端使用了 HTTP/2"
+        ],
+        "answer": 0,
+        "explain": "走私的本质是两台服务器切分字节流的边界不同，多余字节被拼进下一个请求。",
+        "q_en": "What is the precondition for CL.TE smuggling?",
+        "options_en": [
+          "Front-end and back-end disagree on request boundaries",
+          "HTTPS is not enabled",
+          "The headers contain Chinese",
+          "The back-end uses HTTP/2"
+        ],
+        "explain_en": "Smuggling means two servers slice the byte stream at different boundaries; the leftover bytes prefix the next request."
+      },
+      {
+        "q": "同时收到 Content-Length 与 Transfer-Encoding 时，网关最稳妥的处理是？",
+        "options": [
+          "按 Content-Length 处理",
+          "按 chunked 处理",
+          "直接返回 400 拒绝",
+          "随机选一个"
+        ],
+        "answer": 2,
+        "explain": "「帮忙选一个」正是歧义的来源；拒绝含混请求才能根治。",
+        "q_en": "When both Content-Length and Transfer-Encoding arrive, the safest gateway behavior is?",
+        "options_en": [
+          "Honor Content-Length",
+          "Honor chunked",
+          "Reject with 400",
+          "Pick one at random"
+        ],
+        "explain_en": "Picking one is exactly where the ambiguity comes from; rejecting ambiguous requests removes the class."
+      },
+      {
+        "q": "为什么端到端 HTTP/2 能防这一类走私？",
+        "options": [
+          "HTTP/2 有加密",
+          "帧边界是二进制长度前缀，无文本解析歧义",
+          "HTTP/2 更快",
+          "HTTP/2 不允许代理"
+        ],
+        "answer": 1,
+        "explain": "走私依赖文本报文边界歧义；HTTP/2 二进制分帧从机制上消除了歧义（但 H2 降级到 H1 会重新引入）。",
+        "q_en": "Why does end-to-end HTTP/2 prevent this class of smuggling?",
+        "options_en": [
+          "HTTP/2 is encrypted",
+          "Binary length-prefixed frames leave no textual boundary ambiguity",
+          "HTTP/2 is faster",
+          "HTTP/2 forbids proxies"
+        ],
+        "explain_en": "Smuggling relies on textual boundary ambiguity; HTTP/2 binary framing removes it by design (downgrading to H1 reintroduces it)."
+      }
+    ]
+  },
+  {
+    "id": "cwe-119",
+    "kind": "cwe",
+    "category": "内存安全",
+    "cwe": "CWE-119",
+    "title": "内存缓冲区越界操作",
+    "title_en": "Improper Restriction of Operations within the Bounds of a Memory Buffer",
+    "level": "intermediate",
+    "icon": "119",
+    "color": "memory",
+    "summary": "程序在缓冲区的边界之外读或写内存——它是 CWE-787（越界写）、CWE-125（越界读）等一众内存破坏问题的父类，常年占据高危 CVE 的最大来源。",
+    "summary_en": "The program reads or writes memory outside the intended buffer. It is the parent class of CWE-787 (out-of-bounds write) and CWE-125 (out-of-bounds read) — the largest source of critical CVEs year after year.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "C/C++ 把「边界检查」完全交给程序员：数组、指针、字符串就是内存地址加约定长度，语言本身不知道也不关心你访问到哪儿。一旦长度计算错误（off-by-one、整数溢出后变小、结构体版本不匹配），读写就越过边界，踩到相邻变量、返回地址、函数指针。越界写通常可被武器化为代码执行，越界读则泄露内存内容（Heartbleed 就是 CWE-125）。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "C/C++ leaves bounds checking entirely to the programmer: arrays, pointers and strings are just addresses plus an agreed length, and the language neither knows nor cares how far you access. Once a length computation goes wrong (off-by-one, integer overflow shrinking a size, struct version mismatch), reads and writes cross the boundary into adjacent variables, return addresses, function pointers. Writes are typically exploitable for code execution; reads leak memory (Heartbleed was CWE-125)."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "四类高频根源：一是手动长度运算出错，strlen+1 忘了 +1；二是长度来自不可信输入却没校验上限；三是 memcpy/strcpy 这类不检查目标大小的函数被顺手使用；四是整数问题联动——size_t 回绕或 int 截断让分配 16 字节、拷贝 4GB。多线程下还有 TOCTOU：检查时的长度和使用时的长度已经不是一回事。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Four frequent root causes: manual length arithmetic errors like forgetting the +1 in strlen+1; lengths taken from untrusted input without an upper bound; casual use of functions like memcpy/strcpy that don't know the destination size; and integer interactions — size_t wraparound or int truncation allocating 16 bytes then copying 4GB. Under threads there is also TOCTOU: the length checked and the length used are no longer the same."
+      },
+      {
+        "h": "最小复现",
+        "p": "12 行 C 程序：把命令行参数拷进 16 字节栈缓冲区。正常输入无事，输入超过 15 字节就踩坏栈。用 AddressSanitizer 编译（gcc -fsanitize=address）会立刻报 stack-buffer-overflow，定位到具体行。",
+        "code": [
+          {
+            "lang": "c",
+            "title": "栈溢出最小例子",
+            "bad": "#include <string.h>\n#include <stdio.h>\nint main(int argc, char **argv) {\n    char buf[16];\n    strcpy(buf, argv[1]);  // argv[1] 长度不受控\n    printf(\"%s\\n\", buf);\n    return 0;\n}",
+            "good": "int main(int argc, char **argv) {\n    char buf[16];\n    snprintf(buf, sizeof buf, \"%s\", argv[1]);\n    printf(\"%s\\n\", buf);\n    return 0;\n}",
+            "note": "strcpy 不知道目标有多大；snprintf 以 sizeof 为上限",
+            "title_en": "Minimal stack overflow",
+            "note_en": "strcpy knows nothing about the destination size; snprintf caps at sizeof"
+          }
+        ],
+        "h_en": "Minimal reproduction",
+        "p_en": "A 12-line C program copying argv into a 16-byte stack buffer. Normal input is fine; anything past 15 bytes corrupts the stack. Compiling with AddressSanitizer (gcc -fsanitize=address) reports stack-buffer-overflow immediately with the exact line."
+      },
+      {
+        "h": "真实影响",
+        "p": "微软与谷歌的公开统计都指向同一个数字：其产品中约 70% 的高危漏洞是内存安全问题，CWE-119 家族是主体。心脏出血（OpenSSL）、Stagefright（Android 媒体库）、这两年仍在批量出现的浏览器 0day——根因都在这一族。它不止影响 C/C++：任何调用原生库的宿主（Python 扩展、JNI、Node addon）都会把风险传导上来。",
+        "code": [],
+        "h_en": "Real-world impact",
+        "p_en": "Microsoft and Google both publish the same figure: about 70% of their critical vulnerabilities are memory-safety issues, with the CWE-119 family as the bulk. Heartbleed (OpenSSL), Stagefright (Android media), and the browser 0days still appearing this year all trace back here. It is not limited to C/C++: any host calling native libraries (Python extensions, JNI, Node addons) inherits the risk."
+      },
+      {
+        "h": "解决办法",
+        "p": "分四层。语言层：新代码优先 Rust/Go/Java 等内存安全语言。函数层：禁用 strcpy/strcat/sprintf/gets，换 snprintf/strlcpy 并始终用 sizeof 目标缓冲；对输入长度先校验再使用。工具层：CI 里跑 ASan/UBSan/Valgrind 与 fuzzing（AFL/libFuzzer），越界在测试期爆炸而不是生产期。平台层：打开栈保护（-fstack-protector）、ASLR、DEP、CFG，把可利用性再砍一档。",
+        "code": [],
+        "h_en": "Mitigations",
+        "p_en": "Four layers. Language: prefer memory-safe languages (Rust/Go/Java) for new code. Functions: ban strcpy/strcat/sprintf/gets, use snprintf/strlcpy with sizeof the destination, and validate input length before use. Tooling: run ASan/UBSan/Valgrind and fuzzing (AFL/libFuzzer) in CI so overflows explode in tests, not production. Platform: enable stack protector, ASLR, DEP and CFG to cut exploitability further."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-119",
+        "url": "https://cwe.mitre.org/data/definitions/119.html"
+      },
+      {
+        "name": "CISA: The Case for Memory Safe Roadmaps",
+        "url": "https://www.cisa.gov/resources-tools/resources/the-case-for-memory-safe-roadmaps"
+      }
+    ],
+    "tags": [
+      "内存安全",
+      "C/C++",
+      "缓冲区"
+    ],
+    "quiz": [
+      {
+        "q": "CWE-119 与 CWE-787、CWE-125 的关系是？",
+        "options": [
+          "完全不同的三类问题",
+          "CWE-119 是父类，787 是越界写、125 是越界读",
+          "119 只指栈溢出",
+          "787 是 119 的父类"
+        ],
+        "answer": 1,
+        "explain": "119 描述「边界外操作」这个总类；按读/写方向细分为 125（读）与 787（写）等子类。",
+        "q_en": "How does CWE-119 relate to CWE-787 and CWE-125?",
+        "options_en": [
+          "Three unrelated classes",
+          "119 is the parent; 787 is out-of-bounds write, 125 is out-of-bounds read",
+          "119 means stack overflow only",
+          "787 is the parent of 119"
+        ],
+        "explain_en": "119 covers buffer-boundary violations in general; it splits by direction into 125 (read) and 787 (write), among others."
+      },
+      {
+        "q": "下面哪个函数替换能直接消除例子中的栈溢出？",
+        "options": [
+          "把 strcpy 换成 strcat",
+          "把 strcpy 换成带目标大小的 snprintf",
+          "把 buf 改成 32 字节",
+          "编译时加 -O2"
+        ],
+        "answer": 1,
+        "explain": "问题不在缓冲区大小或优化级别，而在拷贝没有上限；snprintf(buf, sizeof buf, ...) 给了硬上限。",
+        "q_en": "Which replacement directly fixes the stack overflow in the example?",
+        "options_en": [
+          "strcat instead of strcpy",
+          "snprintf with the destination size instead of strcpy",
+          "Make buf 32 bytes",
+          "Compile with -O2"
+        ],
+        "explain_en": "The problem is not buffer size or optimization; it is the unbounded copy. snprintf(buf, sizeof buf, ...) imposes a hard cap."
+      },
+      {
+        "q": "Heartbleed（心脏出血）属于 CWE-119 家族里的哪一支？",
+        "options": [
+          "越界写",
+          "越界读",
+          "释放后使用",
+          "双重释放"
+        ],
+        "answer": 1,
+        "explain": "Heartbleed 让服务器把请求长度之外的内存内容读出来返回，是 CWE-125（越界读）。",
+        "q_en": "Which branch of the CWE-119 family is Heartbleed?",
+        "options_en": [
+          "Out-of-bounds write",
+          "Out-of-bounds read",
+          "Use after free",
+          "Double free"
+        ],
+        "explain_en": "Heartbleed made the server return memory beyond the request length — CWE-125, out-of-bounds read."
+      }
+    ]
+  },
+  {
+    "id": "cwe-772",
+    "kind": "cwe",
+    "category": "资源管理",
+    "cwe": "CWE-772",
+    "title": "资源未释放（句柄/连接泄漏）",
+    "title_en": "Missing Release of Resource after Effective Lifetime",
+    "level": "intermediate",
+    "icon": "772",
+    "color": "resource",
+    "summary": "文件句柄、数据库连接、socket、锁在用完之后没有归还，程序活得越久资源越少，直到某天耗尽上限，整个服务无预兆地瘫掉。",
+    "summary_en": "File handles, DB connections, sockets and locks are not returned after use. The longer the process lives, the fewer resources remain — until one day the limit is hit and the service falls over without warning.",
+    "sections": [
+      {
+        "h": "原理",
+        "p": "操作系统给每个进程的资源都有上限：Linux 默认单进程 1024 个文件描述符，数据库连接池几十到几百，线程栈几 MB。泄漏的可怕之处在于它不报错——前 1000 次泄漏安静无声，第 1025 次 open() 才失败，而那时「出问题的地方」和「泄漏的地方」往往毫不相干。GC 语言只自动回收内存，句柄、连接、锁这些「外部资源」仍需显式归还。",
+        "code": [],
+        "h_en": "Principle",
+        "p_en": "The OS caps per-process resources: 1024 file descriptors by default on Linux, tens to hundreds of pooled DB connections, a few MB per thread stack. Leaks are scary because they are silent — the first thousand leak quietly, then open() number 1025 fails, and the place that fails has nothing to do with the place that leaks. GC languages reclaim memory only; handles, connections and locks are external resources you must return explicitly."
+      },
+      {
+        "h": "为什么会发生",
+        "p": "绝大多数泄漏不是忘了写 close，而是 close 写在「正常路径」上：try 里中途 return、异常抛出、超时重试新开了一个连接而旧的没关、回调地狱里某个分支漏了。还有两类隐蔽形态：池化资源「借了不还」（连接池取出的连接没 release，池很快被借空）；以及缓存/监听器只加不删，对象本身被强引用挂着，GC 也无能为力。",
+        "code": [],
+        "h_en": "Why it happens",
+        "p_en": "Most leaks are not a forgotten close but a close written on the happy path: an early return inside try, an exception, a retry opening a new connection while the old one stays open, a callback branch that misses cleanup. Two subtle forms: pooled resources borrowed and never released back, draining the pool; and caches or listeners that only grow, keeping objects strongly referenced beyond the GC's reach."
+      },
+      {
+        "h": "最小复现",
+        "p": "Python 例子：循环里 open() 不 close，几千次后 OSError: [Errno 24] Too many open files。修复不是「记得关」，而是用 with 让关闭与作用域绑定，任何路径退出都会归还。",
+        "code": [
+          {
+            "lang": "python",
+            "title": "句柄泄漏与修复",
+            "bad": "for path in logs:/n    f = open(path)\n    head = f.readline()\n    if not head:/n        continue   # 异常路径：f 永远不会被 close\n    process(head)\n    f.close()",
+            "good": "for path in logs:/n    with open(path) as f:   # 作用域结束即归还，异常也不例外\n        head = f.readline()\n        if head:/n            process(head)",
+            "note": "with/try-finally/defer/RAII 的共同思想：把归还绑在作用域上",
+            "title_en": "Handle leak and fix",
+            "note_en": "with / try-finally / defer / RAII share one idea: tie release to scope"
+          }
+        ],
+        "h_en": "Minimal reproduction",
+        "p_en": "A Python loop that opens files without closing: after a few thousand iterations, OSError: [Errno 24] Too many open files. The fix is not remembering to close — it is binding the close to scope with with, so every exit path returns the handle."
+      },
+      {
+        "h": "真实影响",
+        "p": "CWE-772 很少上头条，但它是线上事故的稳定来源：服务跑三天后句柄耗尽重启、连接池借空导致全站超时、定时任务每次泄漏一个线程最终 OOM。它还和安全直接相关——描述符耗尽后安全日志写不进去，等于给攻击者关掉了监控。排查工具：lsof /proc/<pid>/fd 看句柄、连接池指标看借用时长、pprof/jmap 看对象驻留。",
+        "code": [],
+        "h_en": "Real-world impact",
+        "p_en": "CWE-772 rarely makes headlines, but it is a steady source of production incidents: a service exhausts handles after three days and restarts, a drained connection pool times out the whole site, a cron job leaking one thread per run ends in OOM. It also has a security angle — once descriptors are exhausted, security logs can no longer be written, effectively switching off the cameras for an attacker. Tooling: lsof and /proc/<pid>/fd for handles, pool metrics for borrow time, pprof/jmap for retained objects."
+      },
+      {
+        "h": "解决办法",
+        "p": "一条总原则：谁申请谁归还，归还绑在作用域上。Python 用 with、Java 用 try-with-resources、Go 用 defer、Rust/C++ 用 RAII。池化资源封装成「借出即作用域」的 API，让漏还在编译期或 review 期就显眼。再加上两道保险：监控资源余量（fd 数、池内空闲连接数）设告警线，在耗尽之前先看到曲线；对长寿命进程做定期压测，泄漏在预发环境暴露。",
+        "code": [],
+        "h_en": "Mitigations",
+        "p_en": "One rule: whoever acquires, releases — and the release is bound to scope. with in Python, try-with-resources in Java, defer in Go, RAII in Rust/C++. Wrap pooled resources in borrow-scoped APIs so a missing release is visible at compile or review time. Add two safety nets: monitor resource headroom (fd count, idle pooled connections) with alert thresholds, and stress-test long-lived processes regularly so leaks surface in staging."
+      }
+    ],
+    "refs": [
+      {
+        "name": "MITRE CWE-772",
+        "url": "https://cwe.mitre.org/data/definitions/772.html"
+      },
+      {
+        "name": "Linux man: getrlimit(2)",
+        "url": "https://man7.org/linux/man-pages/man2/getrlimit.2.html"
+      }
+    ],
+    "tags": [
+      "资源管理",
+      "稳定性",
+      "句柄泄漏"
+    ],
+    "quiz": [
+      {
+        "q": "句柄泄漏最危险的特性是？",
+        "options": [
+          "立刻崩溃",
+          "长期无症状，耗尽后在无关位置失败",
+          "一定会被 GC 回收",
+          "只影响 C 语言"
+        ],
+        "answer": 1,
+        "explain": "泄漏静默累积，真正报错的位置通常不是泄漏的位置，排查困难。",
+        "q_en": "What is the most dangerous trait of a handle leak?",
+        "options_en": [
+          "It crashes immediately",
+          "Silent for a long time, then fails at an unrelated location",
+          "GC always reclaims handles",
+          "It only affects C"
+        ],
+        "explain_en": "Leaks accumulate silently; the failure surfaces far away from the leak, making diagnosis hard."
+      },
+      {
+        "q": "修复泄漏的根本手法是？",
+        "options": [
+          "加大 ulimit",
+          "把资源归还绑定到作用域（with/defer/RAII/try-with-resources）",
+          "定期重启服务",
+          "换更大的服务器"
+        ],
+        "answer": 1,
+        "explain": "扩大上限和重启只是推迟爆发；作用域绑定的归还让任何退出路径都必然释放。",
+        "q_en": "What is the fundamental fix for resource leaks?",
+        "options_en": [
+          "Raise ulimit",
+          "Bind release to scope (with / defer / RAII / try-with-resources)",
+          "Restart the service regularly",
+          "Buy a bigger server"
+        ],
+        "explain_en": "Bigger limits and restarts only postpone the failure; scope-bound release guarantees cleanup on every exit path."
+      },
+      {
+        "q": "下列哪类资源不会被垃圾回收器自动回收？",
+        "options": [
+          "堆上的普通对象",
+          "文件句柄与数据库连接",
+          "字符串",
+          "数组"
+        ],
+        "answer": 1,
+        "explain": "GC 只管内存；句柄、连接、锁是进程向操作系统借的外部资源，必须显式归还。",
+        "q_en": "Which of these is NOT automatically reclaimed by a garbage collector?",
+        "options_en": [
+          "Plain heap objects",
+          "File handles and database connections",
+          "Strings",
+          "Arrays"
+        ],
+        "explain_en": "GC only manages memory; handles, connections and locks are external resources borrowed from the OS and must be returned explicitly."
+      }
+    ]
+  }
+]
