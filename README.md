@@ -108,6 +108,7 @@ npx tauri build              # 产出 NSIS 安装包
 | [docs/发布与更新.md](docs/发布与更新.md) | 发版流程、两套签名、`latest.json` 模板 |
 | [docs/数据来源与合规.md](docs/数据来源与合规.md) | 五个数据源的许可与采集边界 |
 | [CHANGELOG.md](CHANGELOG.md) | v0.1 → v1.0.5 演进记录 |
+| [docs/开发日志.md](docs/开发日志.md) | v0.6.0 → v1.0.5 逐版开发日志（新增/变更/修复/工程） |
 
 ## 许可
 
