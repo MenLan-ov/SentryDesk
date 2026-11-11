@@ -103,13 +103,15 @@ npx tauri build              # 产出 NSIS 安装包
 
 | 文档 | 内容 |
 |---|---|
+| [docs/开发日志.md](docs/开发日志.md) | **完整开发日志**：v0.1.0 → v1.0.5 全部 23 个版本逐版记录（构建时间、安装包体积、改了什么、为什么改、哪些判断被推翻），另含架构演进、踩坑归档、五层测试体系与实测指标 |
+| [docs/发布与更新.md](docs/发布与更新.md) | **发布流程**：两套签名（Authenticode + minisign）、四步发版、`latest.json` 模板、CI 三道关、发布检查清单 |
 | [docs/演示脚本.md](docs/演示脚本.md) | 5 分钟现场演示流程 + 预判提问与回答（答辩用） |
 | [docs/评审与升级清单.md](docs/评审与升级清单.md) | 自我评审记录：v0.8.7 基线 → v1.0.5 复评 |
-| [docs/发布与更新.md](docs/发布与更新.md) | 发版流程、两套签名、`latest.json` 模板 |
 | [docs/数据来源与合规.md](docs/数据来源与合规.md) | 五个数据源的许可与采集边界 |
-| [CHANGELOG.md](CHANGELOG.md) | v0.1 → v1.0.5 演进记录 |
-| [docs/开发日志.md](docs/开发日志.md) | v0.6.0 → v1.0.5 逐版开发日志（新增/变更/修复/工程） |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 五层单向依赖、模块职责、数据流与合规约束 |
+| [CHANGELOG.md](CHANGELOG.md) | 简版变更记录（一版一条，适合快速浏览） |
 
+> 三份记录的分工：**CHANGELOG** 是一句话摘要；**开发日志**是完整过程与理由；**发布与更新**是操作手册。
 ## 许可
 
 代码以 [MIT License](LICENSE) 发布。
