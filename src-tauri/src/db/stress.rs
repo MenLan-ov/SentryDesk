@@ -241,8 +241,10 @@ fn concurrent_writers_do_not_corrupt() {
     for t in 0..4usize {
         let path = db_path.clone();
         handles.push(std::thread::spawn(move || {
-            let mut c = schema::open(&path).expect("线程内建库失败");
-            let tx = c.transaction().expect("线程内开事务失败");
+            let c = schema::open(&path).expect("线程内建库失败");
+            // 必须用 BEGIN IMMEDIATE（产品写路径同款）：deferred 事务在锁升级时
+            // busy_timeout 不生效，多线程下会直接报 "database is locked"
+            let tx = schema::write_tx(&c).expect("线程内开事务失败");
             for i in 0..500usize {
                 let idx = t * 1000 + i;
                 repo::upsert_item(&tx, &fake_item(idx), "nvd", "2026-11-11T00:00:00Z")
