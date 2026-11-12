@@ -35,3 +35,6 @@ _tools/sign/updater.key
 *.db
 *.db-wal
 *.db-shm
+
+# 本地发布暂存目录
+_release_*/
