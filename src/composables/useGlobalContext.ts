@@ -1,6 +1,6 @@
 // 全局右键兜底：可编辑区域保留系统菜单，其余给应用菜单
 import { openMenu, copyText, SEP } from "./useContextMenu";
-import { theme } from "../store";
+import { refreshCurrentView, theme } from "../store";
 
 export function installGlobalContextMenu() {
   // 注意：必须用冒泡阶段（默认），且放在最后注册，
@@ -46,8 +46,12 @@ export function installGlobalContextMenu() {
     items.push(SEP);
     items.push({
       key: "reload",
-      label: zh ? "刷新界面" : "Reload view",
-      action: () => window.location.reload(),
+      label: zh ? "刷新当前界面" : "Refresh this view",
+      // 不能整页 reload：那会把 view 重置回 home，等于把用户踢回主页。
+      // 这里只重取当前视图需要的数据，界面停在原地。
+      action: () => {
+        void refreshCurrentView();
+      },
     });
     openMenu(e, items);
   });

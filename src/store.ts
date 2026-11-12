@@ -517,3 +517,38 @@ export function goHome() {
   activeCwe.value = null;
 }
 
+/**
+ * 刷新「当前视图」的数据，而不是整页重载。
+ *
+ * 旧实现是 window.location.reload()：WebView 整页重载后 store 全部重新初始化，
+ * view 回到默认的 "home"，于是用户在详情页/看板/错题本点「刷新界面」，
+ * 会被弹回主页 —— 看起来像「刷新把我踢走了」。
+ * 这里按视图分别重取数据，停留在原地。
+ */
+export async function refreshCurrentView() {
+  const jobs: Promise<unknown>[] = [refreshStats(), refreshSources()];
+  switch (view.value) {
+    case "home":
+      jobs.push(doSearch(), loadFavorites());
+      break;
+    case "items":
+      jobs.push(doSearch(), loadFavorites());
+      break;
+    case "learn":
+      jobs.push(loadLessons(), loadProgress(), loadGlossary(), loadPaths());
+      break;
+    case "paths":
+      jobs.push(loadPaths(), loadLessons(), loadProgress());
+      break;
+    case "dashboard":
+      jobs.push(refreshWrongCount(), loadFavorites());
+      break;
+    case "wrong":
+      jobs.push(refreshWrongCount());
+      break;
+    case "settings":
+      break;
+  }
+  await Promise.allSettled(jobs);
+}
+

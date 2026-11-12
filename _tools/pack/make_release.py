@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# 一次性发布脚本：创建 GitHub Release v1.0.5 并上传资产。
+# 一次性发布脚本：创建 GitHub Release v1.1.2 并上传资产。
 # 凭据从环境变量 GH_TOKEN 读取（由调用方注入，不落盘）。
 import json, os, re, sys, urllib.request, urllib.error
 
 REPO = "MenLan-ov/SentryDesk"
-TAG = "v1.0.5"
+TAG = "v1.1.2"
 BASE = r"C:\Users\17638\Desktop\One\sentrydesk"
 NSIS = BASE + r"\src-tauri\target\release\bundle\nsis"
 
@@ -32,15 +32,15 @@ def api(method, url, data=None, ctype="application/json"):
         sys.exit(1)
 
 # 1) latest.json
-sig = open(NSIS + r"\SentryDesk_1.0.5_x64-setup.exe.sig", encoding="utf-8").read().strip()
+sig = open(NSIS + r"\SentryDesk_1.1.2_x64-setup.exe.sig", encoding="utf-8").read().strip()
 latest = {
-    "version": "1.0.5",
+    "version": "1.1.2",
     "notes": "参赛版：种子情报库首启导入 2979 条、首启引导、学习报告 PNG、安装目录自选、检查更新、CWE Top 25 全覆盖、中英双语 100%。",
     "pub_date": "2026-11-11T16:25:00Z",
     "platforms": {
         "windows-x86_64": {
             "signature": sig,
-            "url": "https://github.com/MenLan-ov/SentryDesk/releases/download/v1.0.5/SentryDesk_1.0.5_x64-setup.exe",
+            "url": "https://github.com/MenLan-ov/SentryDesk/releases/download/v1.1.2/SentryDesk_1.1.2_x64-setup.exe",
         }
     },
 }
@@ -49,7 +49,7 @@ with open(lj_path, "w", encoding="utf-8") as f:
     json.dump(latest, f, ensure_ascii=False, indent=2)
 print("latest.json written,", len(sig), "bytes of signature")
 
-# 2) Release notes = CHANGELOG v1.0.5 节正文
+# 2) Release notes = CHANGELOG v1.1.2 节正文
 ch = open(BASE + r"\CHANGELOG.md", encoding="utf-8").read()
 m = re.search(r"## \[1\.0\.5\][^\n]*\n(.*?)\n---", ch, re.S)
 notes = m.group(1).strip()
@@ -68,7 +68,7 @@ except urllib.error.HTTPError:
     st, rel = api("POST", "https://api.github.com/repos/%s/releases" % REPO, {
         "tag_name": TAG,
         "target_commitish": "main",
-        "name": "SentryDesk v1.0.5 · 参赛版",
+        "name": "SentryDesk v1.1.2 · 参赛版",
         "body": notes,
         "draft": False,
         "prerelease": False,
@@ -82,9 +82,9 @@ st, assets = api("GET", "https://api.github.com/repos/%s/releases/%s/assets" % (
 existing = {a["name"]: a["id"] for a in assets}
 
 FILES = [
-    (NSIS + r"\SentryDesk_1.0.5_x64-setup.exe", "SentryDesk_1.0.5_x64-setup.exe"),
-    (NSIS + r"\SentryDesk_1.0.5_x64-setup.exe.sig", "SentryDesk_1.0.5_x64-setup.exe.sig"),
-    (NSIS + r"\SentryDesk_1.0.5_portable.zip", "SentryDesk_1.0.5_portable.zip"),
+    (NSIS + r"\SentryDesk_1.1.2_x64-setup.exe", "SentryDesk_1.1.2_x64-setup.exe"),
+    (NSIS + r"\SentryDesk_1.1.2_x64-setup.exe.sig", "SentryDesk_1.1.2_x64-setup.exe.sig"),
+    (NSIS + r"\SentryDesk_1.1.2_portable.zip", "SentryDesk_1.1.2_portable.zip"),
     (lj_path, "latest.json"),
 ]
 for path, name in FILES:

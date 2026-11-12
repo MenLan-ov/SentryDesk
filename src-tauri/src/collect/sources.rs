@@ -4,7 +4,7 @@ use crate::models::SourceDef;
 
 /// 固定 User-Agent：含项目名与用途说明，不伪装浏览器、不含任何个人标识
 pub const USER_AGENT: &str =
-    "SentryDesk/1.0.5 (local personal research tool; non-commercial, robots-compliant)";
+    "SentryDesk/1.1.2 (local personal research tool; non-commercial, robots-compliant)";
 
 /// 每域名最小间隔（毫秒）。硬性下限 500ms，配置更小也强制 500。
 pub const MIN_INTERVAL_FLOOR_MS: u64 = 500;
@@ -84,6 +84,42 @@ pub fn entry_url(key: &str) -> Option<String> {
         _ => None,
     }
 }
+
+/// 单次采集要访问的 URL 列表。
+///
+/// 为什么 NVD 不止一个 URL：只取「最新 50 条」时，CWE 分布极度倾斜
+/// （CWE-862/79/89 占大头），教学卡里那些冷门类别一条都落不到库里，
+/// 用户点进去就是空列表。NVD 官方支持 cweId 过滤，按类别定向补齐，
+/// 每个类别只取少量条目，既补全覆盖面又不放大请求量。
+/// 其余源仍然是一源一请求，保持原有合规节奏。
+pub fn entry_urls(key: &str) -> Vec<String> {
+    match key {
+        "nvd" => {
+            let mut v = vec![entry_url("nvd").unwrap_or_default()];
+            // 与教学卡/常见弱点对齐的定向查询；每类 20 条足够「至少有内容」
+            for cwe in NVD_CWE_TARGETS {
+                v.push(format!(
+                    "https://services.nvd.nist.gov/rest/json/cves/2.0?cweId={cwe}&resultsPerPage=20"
+                ));
+            }
+            v
+        }
+        _ => entry_url(key).into_iter().collect(),
+    }
+}
+
+/// 定向补采的 CWE 列表。
+/// 只放「NVD 确实会分配 CVE」的类别：像 CWE-1059 / CWE-1104 / CWE-29 这类
+/// 设计/过程层面的弱点，NVD 侧就是 0 条，查了也是空，不放进来浪费请求。
+/// 只补「教学卡有卡、库里却几乎没有」的类别。
+/// 数量刻意压到 4 个：NVD 无 key 时限 5 次/30s，每类 20 条已经够「点进去有内容」，
+/// 再加只会把一次采集拖到一分钟以上，用户体感很差。
+pub const NVD_CWE_TARGETS: [&str; 4] = [
+    "CWE-327", // 使用已被攻破/有风险的加密算法（NVD 428 条）
+    "CWE-799", // 交互频率控制不当（NVD 2 条，全取）
+    "CWE-311", // 敏感数据缺失加密（NVD 252 条）
+    "CWE-330", // 不充分的随机值（NVD 283 条）
+];
 
 /// robots.txt 检查用的路径
 pub fn robots_path(key: &str) -> &'static str {

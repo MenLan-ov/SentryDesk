@@ -30,7 +30,10 @@ pub async fn collect_source(
     robots_state: &str,
 ) -> Result<SourceOutcome, AppError> {
     let t0 = std::time::Instant::now();
-    let url = sources::entry_url(&def.key)
+    let urls = sources::entry_urls(&def.key);
+    let url = urls
+        .first()
+        .cloned()
         .ok_or_else(|| AppError::Config(format!("未定义入口 URL：{}", def.key)))?;
 
     // robots 禁止则跳过，不发起请求
@@ -52,10 +55,6 @@ pub async fn collect_source(
         });
     }
 
-    // 限速（同域名串行，不同域名独立计时）
-    let domain = limiter::domain_of(&url);
-    limiter.acquire(&domain, def.min_interval_ms).await;
-
     let extra: Vec<(&str, &str)> = if def.key == "ghsa" {
         vec![
             ("Accept", "application/vnd.github+json"),
@@ -65,35 +64,62 @@ pub async fn collect_source(
         vec![]
     };
 
-    let (body, http_status) = match fetcher::fetch(client, &url, &extra).await {
-        Ok(o) => (o.body, o.http_status),
-        Err(e) => {
-            let msg = e.to_string();
-            if let Ok(conn) = crate::db::schema::open(db_path) {
-                let _ = crate::db::repo::log_collect(
-                    &conn, &def.key, &url, None, t0.elapsed().as_millis() as i64, false, Some(&msg),
-                );
-            }
-            return Ok(SourceOutcome {
-                source_key: def.key.clone(),
-                name: def.name.clone(),
-                status: "failed".into(),
-                fetched: 0,
-                inserted: 0,
-                skipped: 0,
-                elapsed_ms: t0.elapsed().as_millis() as u64,
-                message: Some(msg),
-            });
-        }
-    };
+    // 逐个 URL 抓取：每轮都单独过限速，绝不因为「是同一个源」就跳过间隔。
+    // 任何一个 URL 失败都不整体失败——定向补采本来就是锦上添花，
+    // 主入口成功就该把主入口的数据落库。
+    let mut parsed: Vec<ParsedItem> = Vec::new();
+    let mut first_err: Option<String> = None;
+    let mut ok_urls = 0usize;
+    let mut http_status: Option<u16> = None;
+    for u in &urls {
+        let domain = limiter::domain_of(u);
+        limiter.acquire(&domain, def.min_interval_ms).await;
 
-    // 解析（纯 CPU，无 await）
-    let parsed: Vec<ParsedItem> = match def.key.as_str() {
-        "nvd" => crate::parse::nvd::NvdParser.parse(&body)?,
-        "ghsa" => crate::parse::ghsa::GhsaParser.parse(&body)?,
-        "cisa_kev" => crate::parse::kev::KevParser.parse(&body)?,
-        _ => crate::parse::rss::RssParser { source_key: def.key.clone() }.parse(&body)?,
-    };
+        let body = match fetcher::fetch(client, u, &extra).await {
+            Ok(o) => {
+                ok_urls += 1;
+                if http_status.is_none() {
+                    http_status = o.http_status;
+                }
+                o.body
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                if let Ok(conn) = crate::db::schema::open(db_path) {
+                    let _ = crate::db::repo::log_collect(
+                        &conn, &def.key, u, None, t0.elapsed().as_millis() as i64, false, Some(&msg),
+                    );
+                }
+                if first_err.is_none() {
+                    first_err = Some(msg);
+                }
+                continue;
+            }
+        };
+
+        // 解析（纯 CPU，无 await）
+        let mut got: Vec<ParsedItem> = match def.key.as_str() {
+            "nvd" => crate::parse::nvd::NvdParser.parse(&body)?,
+            "ghsa" => crate::parse::ghsa::GhsaParser.parse(&body)?,
+            "cisa_kev" => crate::parse::kev::KevParser.parse(&body)?,
+            _ => crate::parse::rss::RssParser { source_key: def.key.clone() }.parse(&body)?,
+        };
+        parsed.append(&mut got);
+    }
+
+    // 一个都没成功才算这个源失败
+    if ok_urls == 0 {
+        return Ok(SourceOutcome {
+            source_key: def.key.clone(),
+            name: def.name.clone(),
+            status: "failed".into(),
+            fetched: 0,
+            inserted: 0,
+            skipped: 0,
+            elapsed_ms: t0.elapsed().as_millis() as u64,
+            message: first_err.or_else(|| Some("全部请求失败".into())),
+        });
+    }
 
     let total_fetched = parsed.len();
     let now = chrono::Utc::now().to_rfc3339();

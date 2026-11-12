@@ -143,12 +143,30 @@ onMounted(() => {
         </div>
       </header>
 
-      <!-- 真实漏洞入口 -->
-      <button v-if="activeLesson.cwe" class="real-entry" @click="jumpToCwe(activeLesson.cwe!)">
+      <!-- 真实漏洞入口。
+           计数为 0 时不渲染成可点击按钮：这些 CWE 是设计/过程类弱点，
+           NVD 根本不会为它们分配 CVE 号，点进去必然是空列表。
+           与其给一个假入口，不如如实说明为什么没有。 -->
+      <button
+        v-if="activeLesson.cwe && lessonCveCount > 0"
+        class="real-entry"
+        @click="jumpToCwe(activeLesson.cwe!)"
+      >
         <span class="real-label">{{ zh ? '本地情报库中该类型的真实漏洞' : 'Real findings of this type in your local DB' }}</span>
         <span class="real-n mono">{{ lessonCveCount }}</span>
         <span class="real-arrow">→</span>
       </button>
+      <div v-else-if="activeLesson.cwe" class="real-empty">
+        <span class="real-label">{{ zh ? '本地情报库中该类型的真实漏洞' : 'Real findings of this type in your local DB' }}</span>
+        <span class="real-n mono">0</span>
+        <p class="real-why">
+          {{
+            zh
+              ? '这一类属于设计/过程层面的弱点，NVD 不会为它分配 CVE 编号，因此没有可关联的条目。'
+              : 'This class is a design/process weakness; NVD assigns no CVE IDs to it, so there are no linked items.'
+          }}
+        </p>
+      </div>
 
       <!-- 正文 -->
       <article class="body">
@@ -277,6 +295,11 @@ onMounted(() => {
 .real-label { font-size: var(--font-sm); color: var(--color-accent); flex: 1; }
 .real-n { font-size: var(--font-lg); font-weight: 700; color: var(--color-accent); }
 .real-arrow { color: var(--color-accent); }
+/* 无 CVE 可关联时的静态说明块：保持同一视觉位置，但不给点击暗示 */
+.real-empty { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); width: 100%; max-width: 860px; padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); background: var(--color-surface-2); border: 1px solid var(--color-line); border-radius: var(--radius-md); }
+.real-empty .real-label { color: var(--color-text-secondary); }
+.real-empty .real-n { color: var(--color-text-tertiary); }
+.real-why { flex-basis: 100%; margin: 0; font-size: var(--font-xs); color: var(--color-text-tertiary); line-height: 1.7; }
 
 .body { max-width: 860px; display: flex; flex-direction: column; gap: var(--space-5); }
 .sec { padding-left: var(--space-4); border-left: 1px solid var(--color-border); }

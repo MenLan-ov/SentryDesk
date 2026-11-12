@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import Icon from "./Icon.vue";
-import { doSearch, favoriteCount, filter, sources, stats, t, theme } from "../store";
+import { doSearch, favoriteCount, filter, showToast, sources, stats, t, theme, total } from "../store";
 
 const zh = computed(() => theme.lang === "zh-CN");
 
@@ -29,6 +29,23 @@ function pickSource(key: string | null) {
 function refresh() {
   filter.offset = 0;
   doSearch();
+}
+
+/**
+ * 切换「稍后读」。
+ * 之前直接内联在模板里，收藏为空时点完只是列表变空，
+ * 没有任何提示，看起来像按钮坏了。这里补上状态提示。
+ */
+async function toggleFavOnly() {
+  filter.favorite_only = !filter.favorite_only;
+  filter.offset = 0;
+  await doSearch();
+  if (!filter.favorite_only) return;
+  showToast(
+    favoriteCount.value === 0
+      ? (zh.value ? "还没有收藏，点条目右上角星标" : "Nothing saved yet — use the star on an item")
+      : (zh.value ? `只看稍后读：${total.value} 条` : `Saved only: ${total.value}`)
+  );
 }
 
 function setSeverity(v: string | null) {
@@ -82,7 +99,7 @@ const sourceCount = (key: string) =>
     <section class="block tight">
       <button
         :class="['row', 'fav-row', { active: filter.favorite_only }]"
-        @click="filter.favorite_only = !filter.favorite_only; refresh()"
+        @click="toggleFavOnly()"
       >
         <Icon name="star" :size="13" :class="['fav-ico', { on: filter.favorite_only }]" />
         <span class="row-label">{{ zh ? "稍后读" : "Saved" }}</span>

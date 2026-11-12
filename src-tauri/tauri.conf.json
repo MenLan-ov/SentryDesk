@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SentryDesk",
-  "version": "1.0.5",
+  "version": "1.1.2",
   "identifier": "com.sentrydesk.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -74,7 +74,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxRDA4NkI0Rjc5MkE3RDQKUldUVXA1TDN0SWJRWVY0UTNSd1BLNVN6MjduRDJmdmZxcVVoVFR0akNoYXQ0bExKc2RmWWRVSVEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE5RTE5OEFDMkU0QUQ5NjgKUldSbzJVb3VySmpocVd3UStyV3JLZW1hTnBycVZZTDJjcWZEYS9EWnpuRWhFYmNlS05wRm5kVmQK",
       "endpoints": [
         "https://github.com/MenLan-ov/SentryDesk/releases/latest/download/latest.json"
       ],

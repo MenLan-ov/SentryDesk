@@ -196,6 +196,13 @@ const rows = computed<Row[]>(() => {
   return out;
 });
 
+/**
+ * 分组只是「显示用的重排」。
+ * v1.0.5 的 bug：rows 按匹配分数排序，grouped 按固定分组顺序重排，
+ * 但键盘 Enter / 点击都用分组后的下标去索引按分数排序的 rows，
+ * 两个下标体系不同源 —— 点「设置」实际执行的是「开始今日复习」。
+ * 修复：分组的 start 不再自己累加，改为在「显示顺序」里反查真实下标。
+ */
 const grouped = computed(() => {
   const order: { id: string; label: string }[] = [
     { id: "search", label: zh.value ? "检索" : "Search" },
@@ -204,16 +211,22 @@ const grouped = computed(() => {
     { id: "lesson", label: zh.value ? "教学卡" : "Lessons" },
     { id: "glossary", label: zh.value ? "术语" : "Glossary" },
   ];
-  const out: { label: string; rows: Row[]; start: number }[] = [];
-  let idx = 0;
+  const out: { label: string; rows: Row[]; idxs: number[]; offset: number }[] = [];
+  let offset = 0;
   for (const g of order) {
-    const rs = rows.value.filter((r) => r.group === g.id);
-    if (!rs.length) continue;
-    out.push({ label: g.label, rows: rs, start: idx });
-    idx += rs.length;
+    const idxs: number[] = [];
+    rows.value.forEach((r, i) => {
+      if (r.group === g.id) idxs.push(i);
+    });
+    if (!idxs.length) continue;
+    out.push({ label: g.label, rows: idxs.map((i) => rows.value[i]), idxs, offset });
+    offset += idxs.length;
   }
   return out;
 });
+
+/** 显示顺序（分组后）的扁平下标 → rows 里的真实下标 */
+const flatIdxs = computed(() => grouped.value.flatMap((g) => g.idxs));
 
 watch(rows, () => {
   cursor.value = Math.min(cursor.value, Math.max(0, rows.value.length - 1));
@@ -236,8 +249,10 @@ function move(delta: number) {
   });
 }
 
+/** i 是「显示顺序」的下标（分组重排后的位置），需映射回 rows 的真实下标 */
 function runAt(i: number) {
-  const r = rows.value[i];
+  const real = flatIdxs.value[i];
+  const r = real == null ? undefined : rows.value[real];
   if (!r) return;
   close();
   r.run();
@@ -281,9 +296,9 @@ function runAt(i: number) {
             <button
               v-for="(r, i) in g.rows"
               :key="r.key"
-              :class="['row', { active: cursor === g.start + i }]"
-              @mouseenter="cursor = g.start + i"
-              @click="runAt(g.start + i)"
+              :class="['row', { active: cursor === g.offset + i }]"
+              @mouseenter="cursor = g.offset + i"
+              @click="runAt(g.offset + i)"
             >
               <span class="r-ico"><Icon :name="r.icon" :size="14" /></span>
               <span class="r-main">

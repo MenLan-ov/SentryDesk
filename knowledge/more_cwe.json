@@ -1215,7 +1215,7 @@
     "id": "cwe-601-x",
     "kind": "cwe",
     "category": "Web 安全",
-    "cwe": "CWE-1021-x",
+    "cwe": "CWE-346",
     "title": "不安全的内嵌与跨源",
     "title_en": "Cross-Origin Misconfiguration",
     "level": "intermediate",

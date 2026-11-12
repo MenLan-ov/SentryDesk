@@ -213,8 +213,25 @@ function onRowContext(e: MouseEvent, it: Item) {
     <!-- 空结果：必须区分「库里还没有数据」和「筛选条件太严」，
          否则用户在有 530 条数据的情况下被提示"去采集"，会以为程序坏了 -->
     <div v-else-if="items.length === 0" class="state">
-      <div class="empty-ico"><Icon name="filter" :size="20" /></div>
-      <template v-if="hasFilter">
+      <div class="empty-ico">
+        <Icon :name="filter.favorite_only ? 'star' : 'filter'" :size="20" />
+      </div>
+      <!-- 稍后读是独立视图，空的时候必须给专属文案：
+           否则用户点「稍后读」只看到和普通筛选一样的空列表，会认为按钮没反应 -->
+      <template v-if="filter.favorite_only">
+        <p class="empty-title">{{ zh ? "稍后读还是空的" : "Nothing saved yet" }}</p>
+        <p class="empty-hint">
+          {{
+            zh
+              ? "在任意条目的右上角点星标，即可存到这里；数据只留在本机"
+              : "Click the star on any item to keep it here. Data stays on this machine"
+          }}
+        </p>
+        <button class="empty-btn" @click="filter.favorite_only = false; filter.offset = 0; doSearch()">
+          {{ zh ? "看全部情报" : "Browse all" }}
+        </button>
+      </template>
+      <template v-else-if="hasFilter">
         <p class="empty-title">{{ zh ? "没有符合条件的条目" : "No items match" }}</p>
         <p class="empty-hint">
           {{ zh ? "当前筛选组合过窄，可放宽条件再试" : "The filter combination is too narrow; try relaxing it" }}
