@@ -2,6 +2,23 @@
 
 [![CI](https://github.com/MenLan-ov/SentryDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/MenLan-ov/SentryDesk/actions/workflows/ci.yml)
 
+> ## 🏆 参赛作品
+>
+> 本仓库是 **ISC.AI 2026 创新百强「行业AI应用案例挑战赛」** 参赛作品，
+> 方向 **AI+数字安全**，案例名称「使用纳米Work完成安全情报本地聚合解析桌面工具的设计与开发」。
+> 作品由单人借助 **纳米Work** 完成全栈实现（Rust 采集解析内核、Vue 界面、SQLite 数据层与全部文档），
+> 约 34 小时迭代 24 个可安装版本，代码骨架与文档初稿由纳米Work 产出，人工负责审核、实测与取舍。
+>
+> | 赛事交付物 | 入口 |
+> |---|---|
+> | ① 最终作品 | 本仓库 + [v1.1.2 Release](https://github.com/MenLan-ov/SentryDesk/releases/tag/v1.1.2)（4 个资产，可直接安装验证）|
+> | ② 案例说明文档 | [案例说明文档](docs/reports/SentryDesk-案例说明文档.md)（五部分，2,454 字）|
+> | ③ 过程证明 | [开发日志](docs/开发日志.md)（24 版本逐版）· [评审与升级清单](docs/评审与升级清单.md) · [测试报告](docs/reports/SentryDesk-测试报告-v0.7.5.md) · [版本截图](docs/screenshots/) |
+> | ④ 演示视频 | [演示视频（仓库内 MP4）](docs/SentryDesk-演示视频-v1.1.2.mp4) 与 [分镜脚本](docs/演示视频脚本.md)；成片 2:22，覆盖制作过程与最终效果，末尾展示纳米Work 产出物 |
+>
+> 全程本地运行、断网可用、数据不出机器；只做合规采集公开信息，不提供对外服务。
+
+
 **离线优先的漏洞知识库与安全学习工作台** —— 把公网情报变成可教学、可自测、可复习的知识资产。
 
 - 🖥️ Windows 桌面应用（Tauri 2 + Rust + Vue 3 + TypeScript）
@@ -17,7 +34,7 @@ SentryDesk 是一个本地优先的安全知识库。安装包内同时包含：
 
 | 组成 | 内容 |
 |---|---|
-| 情报库 | **2900+ 条漏洞条目**（CISA KEV 在野利用清单 + 近期 CVE），随包分发、离线可查 |
+| 情报库 | **2,979 条漏洞条目**（CISA KEV 在野利用清单 + 近期 CVE），随包分发、离线可查 |
 | 教学卡 | **110 张**中英双语教学卡（CWE 弱点、安全域、实战实验），每卡附参考来源 |
 | 自测题 | **338 道**随卡自测题，答错自动进入错题本 |
 | 术语表 | **91 条**安全术语双语对照 |
@@ -55,7 +72,7 @@ SQLite + FTS5 全文检索，毫秒级搜索；WAL 日志 + 内存临时表保�
 │  Vue 3 + TypeScript 前端（视图层）            │
 │  Home / Items / Lessons / Dashboard / Settings│
 ├─────────────────────────────────────────────┤
-│  Tauri 2 IPC（命令层，27 个 command）          │
+│  Tauri 2 IPC（命令层，47 个 command）          │
 ├─────────────────────────────────────────────┤
 │  Rust 业务层                                  │
 │  collect（合规采集）· parse（解析引擎）         │
